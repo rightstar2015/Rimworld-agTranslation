@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -210,8 +210,24 @@ public sealed class SimplifiedMemory
         return MachineHint.IsMatch(text) ? SimplifiedOrigin.Machine : SimplifiedOrigin.Patch;
     }
 
-    /// <summary>為一個模組的待翻譯條目產生簡中轉繁建議。</summary>
+    private readonly Dictionary<string, (ModScan Scan, List<SimplifiedSuggestion> List)> _suggestCache = new(StringComparer.Ordinal);
+
+    /// <summary>術語表變更後呼叫，讓下次 Suggest 重新轉換。</summary>
+    public void ClearSuggestions() => _suggestCache.Clear();
+
+    /// <summary>為一個模組的待翻譯條目產生簡中轉繁建議（同一份掃描結果只計算一次）。</summary>
     public List<SimplifiedSuggestion> Suggest(ModScan scan)
+    {
+        if (_suggestCache.TryGetValue(scan.Mod.PackageId, out var hit) && ReferenceEquals(hit.Scan, scan))
+        {
+            return hit.List;
+        }
+        var list = SuggestUncached(scan);
+        _suggestCache[scan.Mod.PackageId] = (scan, list);
+        return list;
+    }
+
+    private List<SimplifiedSuggestion> SuggestUncached(ModScan scan)
     {
         EnsureBuilt();
         var result = new List<SimplifiedSuggestion>();
@@ -317,6 +333,18 @@ public sealed class SimplifiedMemory
         {
             reasons.Add("來源疑似機器翻譯");
         }
+        // 英文原文本身可疑：作者沒寫英文（值就是鍵名），或英文資料夾裡放的是中文。
+        var englishSuspect = false;
+        if (e.Kind == EntryKind.Keyed && string.Equals(e.Source.Trim(), e.InjectionPath, StringComparison.OrdinalIgnoreCase))
+        {
+            englishSuspect = true;
+            reasons.Add("英文就是鍵名本身（作者可能沒寫英文），無法對照原文");
+        }
+        else if (e.Source.Any(c => c >= 0x3400 && c <= 0x9FFF))
+        {
+            englishSuspect = true;
+            reasons.Add("英文原文含中文（模組可能把中文放在 English 資料夾）");
+        }
 
         // ---- 轉換品質 ----
         var ambiguous = conversion.AmbiguousSegments.ToList();
@@ -339,7 +367,12 @@ public sealed class SimplifiedMemory
         {
             signals.Add("套用官方術語：" + string.Join("、", glossaryHits.Take(4)));
         }
-        var validation = Validator.Validate(e.Source, conversion.Text);
+        var agentTerms = conversion.GlossarySegments.Where(g => _zh.AgentTerms.Contains(g.Source)).Select(g => g.Source + "→" + g.Result).Distinct().ToList();
+        if (agentTerms.Count > 0)
+        {
+            reasons.Add("使用了 Agent 新增的術語（需人工或 Agent 確認）：" + string.Join("、", agentTerms.Take(3)));
+        }
+        var validation = Validator.Validate(e.Source, conversion.Text, new ValidatorOptions { ProperNounWhitelist = new HashSet<string>(_config.ProperNouns, StringComparer.OrdinalIgnoreCase) });
         if (!validation.Accepted)
         {
             reasons.Add("轉換結果驗證失敗：" + string.Join("、", validation.Rejects.Select(r => r.Code)));
@@ -351,7 +384,7 @@ public sealed class SimplifiedMemory
         {
             tier = SuggestionTier.Retranslate;
         }
-        else if (ambiguous.Count > 0 || conflicts.Count > 0 || labelHint != null || suspicious || src.Origin == SimplifiedOrigin.Machine || !src.CurrentFolder || !validation.Accepted)
+        else if (ambiguous.Count > 0 || conflicts.Count > 0 || labelHint != null || suspicious || englishSuspect || agentTerms.Count > 0 || src.Origin == SimplifiedOrigin.Machine || !src.CurrentFolder || !validation.Accepted)
         {
             tier = SuggestionTier.Review;
             if (!src.CurrentFolder && !reasons.Any(r => r.Contains("資料夾")))

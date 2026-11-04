@@ -11,7 +11,7 @@ import sys
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     exe, tool, raw = sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "{}"
-    args = json.load(open(raw, encoding="utf-8")) if os.path.isfile(raw) else json.loads(raw)
+    args = json.load(open(raw, encoding="utf-8-sig")) if os.path.isfile(raw) else json.loads(raw)
     proc = subprocess.Popen([exe, "serve"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     def rpc(msg):

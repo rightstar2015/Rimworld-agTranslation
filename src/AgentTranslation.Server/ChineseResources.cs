@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Formats.Tar;
 using System.IO;
@@ -31,6 +31,14 @@ public sealed class ChineseResources
 
     private PhraseDictionary _twVariants = null!;
     private PhraseDictionary _stCharacters = null!;
+    private PhraseDictionary _stPhrases = null!;
+    private PhraseDictionary[] _tw = null!;
+    private PhraseDictionary _norm = null!;
+
+    /// <summary>經 MCP（Agent）新增的 s2t 術語來源詞。命中這些詞的轉換不會被自動採用。</summary>
+    public HashSet<string> AgentTerms { get; } = new(StringComparer.Ordinal);
+    /// <summary>使用者／內建 s2t 術語（簡中 → 繁中）。</summary>
+    public Dictionary<string, GlossaryEntry> UserTerms { get; } = new(StringComparer.Ordinal);
 
     public ChineseConverter PlainConverter { get; private set; } = null!;
     /// <summary>官方繁中與 OpenCC 用詞不同、但不是同字異體的詞（例如 按钮→鈕扣），只在整段文字完全相同時當成校對提示。</summary>
@@ -71,14 +79,34 @@ public sealed class ChineseResources
         }
         SimplifiedChars.UseSet(simplifiedOnly);
 
+        r._stPhrases = stPhrases;
+        r._tw = tw;
+        r._norm = norm;
         r.BuildOfficialGlossary(gameDir);
+        r.ApplyUserGlossary(Array.Empty<GlossaryEntry>());
+        return r;
+    }
+
+    /// <summary>重建轉換器：官方同字異體術語（無衝突者）＋ 使用者 s2t 術語（優先）。</summary>
+    public void ApplyUserGlossary(IEnumerable<GlossaryEntry> entries)
+    {
         var glossaryDict = new PhraseDictionary();
-        foreach (var t in r.Glossary.Values.Where(t => !t.Conflicting))
+        foreach (var t in Glossary.Values.Where(t => !t.Conflicting))
         {
             glossaryDict.Add(t.Simplified, new[] { t.Traditional[0].Text });
         }
-        r.Converter = new ChineseConverter(stPhrases, stChars, tw, glossaryDict, norm);
-        return r;
+        AgentTerms.Clear();
+        UserTerms.Clear();
+        foreach (var e in entries.Where(e => e.Kind == "s2t"))
+        {
+            glossaryDict.Add(e.Source, new[] { e.Target });
+            UserTerms[e.Source] = e;
+            if (e.Origin == "agent")
+            {
+                AgentTerms.Add(e.Source);
+            }
+        }
+        Converter = new ChineseConverter(_stPhrases, _stCharacters, _tw, glossaryDict, _norm);
     }
 
     private void BuildOfficialGlossary(string gameDir)

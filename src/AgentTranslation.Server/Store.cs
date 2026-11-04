@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,7 +29,10 @@ public sealed class TranslationRecord
     /// <summary>accepted 或 flagged。</summary>
     public string Status { get; set; } = "accepted";
     public List<IssueDto> Flags { get; set; } = new();
+    /// <summary>agent（Agent 提交）或 simplified_auto（簡中自動採用）。</summary>
     public string Origin { get; set; } = "agent";
+    /// <summary>來源細節，例如簡中提供者與可信度。</summary>
+    public string? OriginDetail { get; set; }
     public DateTime UpdatedUtc { get; set; }
 }
 

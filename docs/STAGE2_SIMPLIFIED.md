@@ -1,7 +1,8 @@
-# 階段 2：簡中轉繁設計（草案，待確認）
+# 階段 2：簡中轉繁設計
 
-> 狀態：簡中記憶池、OpenCC 轉換、分級、抽查報告已實作；**目前全部為建議模式**，沒有任何自動採用。
-> 抽查報告：`docs/reports/s2t-spotcheck-2026-11-04.md`。
+> 狀態：簡中記憶池、OpenCC 轉換、分級、抽查報告、自動採用設定、術語表、翻譯記憶、掃描快取已實作。
+> 抽查報告的 20 筆分級已由使用者確認合理（2026-11-04）。**自動採用預設仍關閉**，需使用者自行在 config.json 開啟。
+> 抽查報告：`docs/reports/s2t-spotcheck-2026-11-04.md`（確認前的版本；之後新增的規則見第 9 節）。
 
 ## 1. 對照 1.7 組件確認的前提
 
@@ -93,30 +94,68 @@
 
 一對多字是校對的最大來源（1,940 筆）。前幾名都是常見且預設候選幾乎總是正確的字：个→個、了→了、并→並、后→後、它→它、果→果、具→具。
 
-## 8. 待你決定
+## 8. 自動採用（已實作，預設關閉）
 
-1. 抽查報告的 20 筆分級是否合理。
-2. 一對多字是否要有「低風險字」清單（例如 个、了、并、它、果、具、家），命中這些字時不降級為校對。這需要你確認清單內容。
-3. 直接採用是否要求「新鮮度已確認」。
-4. 自動採用的設定方式（草案，尚未實作）：
+設定在工作資料夾的 `config.json`（預設 `%LOCALAPPDATA%\RimWorldAgentTranslation\config.json`）。**只有使用者能改這個檔案**；MCP 工具不能開啟或放寬條件。
 
 ```json
 {
   "simplified_auto_adopt": {
     "enabled": false,
-    "default": { "tiers": ["direct"], "min_trust": 80, "require_confirmed_freshness": true },
+    "default": { "enabled": true, "min_trust": 80, "require_confirmed_freshness": true },
     "per_mod": {
-      "ancot.ancotlibrary": { "enabled": true },
+      "Ancot.AncotLibrary": { "min_trust": 85, "kinds": ["keyed"] },
       "some.mod": { "enabled": false }
     }
   }
 }
 ```
 
-自動採用的條目仍會經過完整驗證，在 manifest 標記 `origin: "simplified_auto"`，並可一鍵撤回。
+| 欄位 | 意義 |
+|---|---|
+| `enabled`（最外層） | 總開關。false 時一律不採用，per_mod 也不生效 |
+| `default` / `per_mod.<packageId>` | per_mod 只覆蓋有寫的欄位，其餘沿用 default |
+| `min_trust` | 可信度下限（第 5 節） |
+| `require_confirmed_freshness` | true：必須有 EN 註解或同資料夾英文證明是最新的；false：「未驗證」也可採用 |
+| `kinds` | `["keyed"]`、`["def"]` 或省略（全部） |
+| `origins` | `["mod_self"]`、`["patch"]` 或省略（兩者） |
 
-## 9. 抽查中看到、尚未處理的問題
+固定規則（不能用設定改變）：只採用「直接採用」分級；疑似機翻來源、驗證失敗、用到 Agent 新增術語的條目永遠不採用；翻譯包中已有的譯文不覆蓋。
 
-- 英文就是鍵名本身的條目（例如 `CQF_TestDomainExpansion`），多半是作者沒寫英文。目前會被分到「直接採用」，應該改列為校對。
-- 模組把中文放在 English 資料夾（例：ChezhouLib）時，「英文」本身就是簡中，比對結果為「未翻譯」。
-- OpenCC 不處理部分台灣慣用詞（例：身份→身分、调试→偵錯）。這類要靠術語表（`glossary_add`，階段 2 後半實作）或 Agent 校對。
+使用方式：
+- 預覽：`rwat adopt <packageId>`，或 MCP 工具 `adopt_simplified`（apply=false）。回傳可採用數、各略過原因與 10 筆範例。
+- 寫入：`rwat adopt <packageId> --apply`，或 `adopt_simplified`（apply=true，未開啟時會拒絕）。寫入工作資料夾，`origin` 標為 `simplified_auto`，`origin_detail` 記錄提供者、資料夾、可信度、新鮮度；之後執行 `build` 才會進翻譯包。
+- 撤回：`rwat adopt-revert [packageId]` 移除所有 `simplified_auto` 條目（Agent 提交的不受影響），再 `build`。
+
+實測（Dubs Mint Menus，設定 enabled=true、min_trust 85、kinds keyed）：57 筆有簡中，46 筆寫入、11 筆因校對分級略過；建置後輸出正確；撤回移除 46 筆。
+
+## 9. 術語表、翻譯記憶、快取
+
+**術語表**（`glossary.json`，在工作資料夾）：
+- `s2t`：簡中詞 → 繁中詞，參與簡轉繁，優先於官方術語與 OpenCC。至少 2 字（避免單字規則改寫所有文字），譯名不可含簡體字。
+- `en`：英文詞 → 繁中譯名，get_batch 每筆的 `terms` 會列出原文中出現的詞（使用者術語優先，其次是官方繁中的 Def 名稱，約數千筆）。
+- 來源標記：`builtin`（內建：身份→身分、调试→偵錯）、`user`（CLI `rwat glossary-add`）、`agent`（MCP `glossary_add`）。Agent 不能覆蓋 user 的詞；用到 agent s2t 詞的條目改列校對、不會被自動採用——避免模組文字誘導 Agent 新增術語後影響自動採用。
+
+**get_batch 的 memory**（每筆最多 5 項）：
+- `simplified_converted`：簡中轉繁結果，附分級、新鮮度、可信度、問題說明。「重新翻譯」分級會註明只作參考。
+- `official_exact`：遊戲官方繁中對**完全相同英文**的譯法。
+- `pack_exact`：翻譯包內相同英文的既有譯文。
+
+**query_memory**：以英文或中文子字串查官方繁中、翻譯包、術語表。
+
+**掃描快取**（`cache/scan/<packageId>.json`）：只快取抽取結果，「是否已被其他模組翻譯」每次重新判斷。指紋包含遊戲版本、Assembly-CSharp、啟用清單與順序、每個啟用模組的 About.xml、本模組 Defs／English／Assemblies 每個檔案的大小與時間。限制：依賴模組只改 Defs 而 About.xml 不變時不會察覺；`scan_mod` 一律強制重掃。40 個模組的抽查報告：這次首次執行 9 秒、有快取 4 秒（先前記錄的 1 分 43 秒可能包含系統檔案快取未熱的時間，不全是本快取的效果）。
+
+## 10. 確認後新增的分級規則
+
+- 英文就是鍵名本身（作者沒寫英文）→ 校對。
+- 英文原文含中文（模組把中文放在 English 資料夾）→ 校對。
+- 用到 Agent 新增的 s2t 術語 → 校對。
+
+重新統計（同 40 個模組）：直接採用 7,184（原 7,279）／校對 2,620（原 2,525）／重新翻譯 731。
+
+## 11. 尚未處理
+
+- 「低風險一對多字」清單（个、了、并、它…）：未實作，等你決定。目前這些字一律列為校對。
+- **大陸用詞但字形正確**的情況不會被偵測：例如 `添加→添加`（台灣 UI 慣用「新增」）。OpenCC 的台灣詞組表沒有這類詞，分級仍是「直接採用」。可用 `rwat glossary-add s2t 添加 新增` 補上；要不要內建一批常見詞需要你決定。
+- 使用 handle 寫法的簡中 DefInjected 路徑對不上（第 2 節）。
+- Strings／RulePack 的處理。

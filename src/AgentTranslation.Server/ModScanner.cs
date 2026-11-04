@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -53,31 +53,47 @@ public sealed class ModScanner : IDisposable
 
     public IReadOnlyList<string> SchemaWarnings => _schema.Warnings;
 
+    private readonly HashSet<string> _forceFresh = new(StringComparer.Ordinal);
+
     public ModScan Scan(InstalledMod mod)
     {
         if (_cache.TryGetValue(mod.PackageId, out var cached))
         {
             return cached;
         }
-        LoadModAssemblies(mod);
-        var scan = ScanOnce(mod);
-        if (!_allAssembliesLoaded && scan.Notes.Any(n => n.Code == "unknown_class" || n.Code == "unknown_def_type"))
+        var fresh = _forceFresh.Remove(mod.PackageId);
+        var fingerprint = ScanCache.Fingerprint(_env, mod);
+        var extracted = fresh ? null : ScanCache.TryLoad(_config.WorkDir, mod.PackageId, fingerprint);
+        if (extracted == null)
         {
-            // Class 可能定義在依賴模組中：載入所有啟用模組的組件後重掃一次。
-            foreach (var m in _env.ActiveMods)
+            LoadModAssemblies(mod);
+            extracted = Extract(mod);
+            if (!_allAssembliesLoaded && extracted.Notes.Any(n => n.Code == "unknown_class" || n.Code == "unknown_def_type"))
             {
-                LoadModAssemblies(m);
+                // Class 可能定義在依賴模組中：載入所有啟用模組的組件後重掃一次。
+                foreach (var m in _env.ActiveMods)
+                {
+                    LoadModAssemblies(m);
+                }
+                _allAssembliesLoaded = true;
+                extracted = Extract(mod);
             }
-            _allAssembliesLoaded = true;
-            scan = ScanOnce(mod);
+            ScanCache.Save(_config.WorkDir, mod.PackageId, fingerprint, extracted);
         }
+        var scan = Classify(mod, extracted);
         _cache[mod.PackageId] = scan;
         return scan;
     }
 
-    public void Invalidate(string packageId) => _cache.Remove(PackageIds.Normalize(packageId));
+    /// <summary>丟棄記憶體與磁碟快取，下次 Scan 一定重新抽取。</summary>
+    public void Invalidate(string packageId)
+    {
+        var id = PackageIds.Normalize(packageId);
+        _cache.Remove(id);
+        _forceFresh.Add(id);
+    }
 
-    private ModScan ScanOnce(InstalledMod mod)
+    private ExtractionResult Extract(InstalledMod mod)
     {
         var result = new ExtractionResult();
         var folders = _env.LoadFoldersFor(mod);
@@ -141,10 +157,18 @@ public sealed class ModScanner : IDisposable
             if (c != 0) return c;
             return string.CompareOrdinal(a.CanonicalPath, b.CanonicalPath);
         });
+        var final = new ExtractionResult();
+        final.Entries.AddRange(entries);
+        final.Notes.AddRange(result.Notes);
+        return final;
+    }
 
+    /// <summary>依目前所有啟用模組的繁中翻譯，標記已翻譯／路徑寫法可能衝突的條目。</summary>
+    private ModScan Classify(InstalledMod mod, ExtractionResult extracted)
+    {
         var existing = Existing();
-        var scan = new ModScan { Mod = mod, Entries = entries, Notes = result.Notes };
-        foreach (var e in entries)
+        var scan = new ModScan { Mod = mod, Entries = extracted.Entries, Notes = extracted.Notes };
+        foreach (var e in scan.Entries)
         {
             scan.ById[e.Id] = e;
             if (existing.Contains(e))
