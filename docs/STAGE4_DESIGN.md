@@ -128,9 +128,11 @@ MigCorp 的兩個鍵都抓到了：
 
 測試：新增 8 個。掃描器用測試組件裡與遊戲同名的替身型別，驗證參數數量判斷、參數名排除、`TryTranslate` 與動態鍵排除、寫死字串篩選；另有佔位符範圍檢查。全部 107 個測試通過。
 
-### 尚未在遊戲內驗證
+### 遊戲內驗證（2026-11-04，通過）
 
-遊戲找不到鍵時會顯示鍵名，這點已對照反編譯程式碼確認；補上的鍵會像一般 Keyed 一樣生效，則是推論。橋接模組的 Keyed 重載本來就會加入「我們的或缺少的」鍵，所以不重開遊戲也能驗證，步驟如下：
-1. 你把 config.json 的 `code_keys.enabled` 改成 `true`。
-2. 我翻譯 MigCorp 的兩個鍵並重建翻譯包。
-3. 在遊戲內重載，看 MigCorp 設定頁那行鍵名是否變成中文。
+1. 你在 config.json 開啟 `code_keys.enabled`，同時把 `target_language` 改成 `auto`。rwat 依遊戲語言選到簡中，來源顯示 `game_language`。
+2. MigCorp 的兩個鍵照一般流程送出，全部被接受並標為推測。翻譯包從 82 筆變成 84 筆，新增 `_CodeKeys.xml`。
+3. 遊戲沒有重開，Keyed 重載回報 `applied: 2`。你確認設定頁原本顯示的 `MigCorp.Skiptech.Settings.Tuning` 已經變成「寻路调整（高级）：」。
+4. 橋接報告：84 筆全部生效（75 筆 `ok`、9 筆 `ok_extended`）。
+
+結論：補上的鍵和一般 Keyed 一樣生效，Keyed 重載也能加入原本不存在的鍵。
