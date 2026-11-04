@@ -163,7 +163,9 @@ public static class Program
 
     private static async Task<int> Serve()
     {
-        var builder = Host.CreateApplicationBuilder(Array.Empty<string>());
+        // Empty builder: no appsettings.json, user secrets or DOTNET_* configuration is read from the current folder or
+        // environment, so nothing outside config.json can change how the server runs or logs.
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         builder.Logging.ClearProviders();
         // stdout is reserved for the MCP protocol; logs go to stderr and never contain translation content or player data.
         builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
