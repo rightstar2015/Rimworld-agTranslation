@@ -5,7 +5,7 @@ using System.Xml.Linq;
 namespace AgentTranslation.Core
 {
     /// <summary>
-    /// 讀取不可信 XML：禁止 DTD（防 XXE 與實體展開攻擊）、不解析外部資源、限制檔案大小。
+    /// Reads untrusted XML: DTDs prohibited (XXE and entity expansion), no external resources, size limit.
     /// </summary>
     public static class SafeXml
     {
@@ -13,13 +13,13 @@ namespace AgentTranslation.Core
 
         public static XDocument LoadFile(string path) => LoadFile(path, keepComments: false);
 
-        /// <summary>keepComments = true 時保留註解（用來讀取翻譯檔中的 &lt;!-- EN: … --&gt; 原文註記）。</summary>
+        /// <summary>keepComments = true keeps comments (used to read &lt;!-- EN: ... --&gt; source notes in translation files).</summary>
         public static XDocument LoadFile(string path, bool keepComments)
         {
             var info = new FileInfo(path);
             if (info.Length > MaxFileBytes)
             {
-                throw new InvalidDataException("XML 檔案過大：" + path);
+                throw new InvalidDataException("XML file too large: " + path);
             }
             using (var stream = File.OpenRead(path))
             {
@@ -57,7 +57,7 @@ namespace AgentTranslation.Core
                 MaxCharactersFromEntities = 0,
                 MaxCharactersInDocument = MaxFileBytes,
                 IgnoreComments = true,
-                // 與遊戲使用的 XmlDocument（PreserveWhitespace = false）一致：純空白文字節點不保留。
+                // Same as the game's XmlDocument (PreserveWhitespace = false): whitespace-only text nodes are dropped.
                 IgnoreWhitespace = true,
                 IgnoreProcessingInstructions = true,
                 CloseInput = false,

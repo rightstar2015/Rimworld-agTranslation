@@ -5,7 +5,7 @@ using System.Xml.Linq;
 
 namespace AgentTranslation.Core
 {
-    /// <summary>一個 Defs 節點與它的來源。</summary>
+    /// <summary>A Defs node and where it came from.</summary>
     public sealed class DefNode
     {
         public DefNode(XElement element, int loadOrder, string packageId, string file)
@@ -26,20 +26,20 @@ namespace AgentTranslation.Core
     }
 
     /// <summary>
-    /// 提供以 Name 屬性尋找父節點的來源。實作端可延遲載入其他模組的 Defs。
+    /// Source used to look up parents by their Name attribute. Implementations may load other mods' Defs lazily.
     /// </summary>
     public interface INamedNodeSource
     {
-        /// <summary>回傳所有 Name 屬性等於 name 的節點（任何模組）。</summary>
+        /// <summary>Returns every node whose Name attribute equals name (any mod).</summary>
         IEnumerable<DefNode> FindNamed(string name);
     }
 
     /// <summary>
-    /// Defs XML 繼承解析。依 RimWorld 1.7.4998 XmlInheritance 的觀察行為自行實作：
-    /// - 父節點選擇：載入順序 ≤ 自身模組者中，載入順序最大的那個。
-    /// - 合併：子節點屬性覆蓋；子節點有文字則取代內容；子節點無內容時若父有子元素則保留；
-    ///   li 一律附加；同名元素遞迴合併；Inherit="False" 時以子節點內容整個取代。
-    /// 尚未支援：Patches 對 XML 的修改（Patch 在繼承前套用，可能改變文字或清單索引）。
+    /// Defs XML inheritance, re-implemented from the observed behaviour of RimWorld 1.7.4998 XmlInheritance:
+    /// - Parent choice: among nodes from mods with load order &lt;= own, the one with the highest load order.
+    /// - Merge: child attributes override; child text replaces content; an empty child keeps the parent's elements;
+    ///   li items are always appended; same-name elements merge recursively; Inherit="False" replaces the whole node.
+    /// Not supported yet: Patches (applied before inheritance; they can change text or list indices).
     /// </summary>
     public sealed class XmlInheritanceResolver
     {
@@ -77,7 +77,7 @@ namespace AgentTranslation.Core
                 {
                     if (parent == null)
                     {
-                        Warnings.Add("找不到父節點 " + parentName + "（" + node.File + "）");
+                        Warnings.Add("Parent not found: " + parentName + " (" + node.File + ")");
                     }
                     result = new XElement(node.Element);
                 }

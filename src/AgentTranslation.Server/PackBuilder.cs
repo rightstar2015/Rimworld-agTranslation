@@ -33,10 +33,11 @@ public sealed class ManifestEntry
 }
 
 /// <summary>
-/// 產生翻譯包。只寫入 &lt;Mods&gt;/&lt;PackFolderName&gt;，只刪除上一次 manifest 列出的檔案。
-/// 版面：&lt;版本&gt;/Languages/ChineseTraditional/{Keyed,DefInjected/&lt;DefType&gt;}/&lt;模組&gt;/&lt;檔名&gt;。
-/// 對照 1.7.4998 ModContentPack.InitLoadFolders：沒有 LoadFolders.xml 時會載入「根目錄/目前版本」資料夾，
-/// 因此不輸出 LoadFolders.xml（1.7 也已將 default 版本標為過時）。
+/// Builds the translation pack. Writes only inside &lt;Mods&gt;/&lt;PackFolderName&gt; and deletes only files listed in the previous manifest.
+/// Layout: &lt;version&gt;/Languages/&lt;TargetLanguage&gt;/{Keyed,DefInjected/&lt;DefType&gt;}/&lt;mod&gt;/&lt;file&gt;.
+/// Per 1.7.4998 ModContentPack.InitLoadFolders, without LoadFolders.xml the game loads root/&lt;current version&gt;,
+/// so no LoadFolders.xml is written (1.7 also marks the "default" version as deprecated).
+/// The pack holds one language at a time; switching target_language and rebuilding replaces the other language's files.
 /// </summary>
 public sealed class PackBuilder
 {
@@ -45,13 +46,15 @@ public sealed class PackBuilder
     private readonly GameEnvironment _env;
     private readonly ModScanner _scanner;
     private readonly TranslationStore _store;
+    private readonly ValidatorOptions _options;
 
-    public PackBuilder(AppConfig config, GameEnvironment env, ModScanner scanner, TranslationStore store)
+    public PackBuilder(AppConfig config, GameEnvironment env, ModScanner scanner, TranslationStore store, ValidatorOptions options)
     {
         _config = config;
         _env = env;
         _scanner = scanner;
         _store = store;
+        _options = options;
     }
 
     private sealed class Planned
@@ -96,7 +99,7 @@ public sealed class PackBuilder
                     plan.Skipped.Add((pkg, r, "translated_elsewhere"));
                     continue;
                 }
-                var revalidate = Validator.Validate(entry.Source, r.Text, new ValidatorOptions { ProperNounWhitelist = new HashSet<string>(_config.ProperNouns, StringComparer.OrdinalIgnoreCase) });
+                var revalidate = Validator.Validate(entry.Source, r.Text, _options);
                 if (!revalidate.Accepted)
                 {
                     plan.Skipped.Add((pkg, r, "fails_current_validation:" + string.Join(",", revalidate.Rejects.Select(x => x.Code))));
@@ -139,7 +142,7 @@ public sealed class PackBuilder
         var modsDir = Path.GetDirectoryName(packDir)!;
         if (!Directory.Exists(modsDir))
         {
-            throw new InvalidOperationException("找不到遊戲 Mods 資料夾：" + modsDir);
+            throw new InvalidOperationException("Pack output folder not found: " + modsDir);
         }
         var manifestPath = PathSandbox.Resolve(modsDir, _config.PackFolderName + "/" + ManifestName);
         PackManifest? previous = null;
@@ -149,14 +152,14 @@ public sealed class PackBuilder
         }
         else if (Directory.Exists(packDir) && Directory.EnumerateFileSystemEntries(packDir).Any())
         {
-            throw new InvalidOperationException("翻譯包資料夾已存在但不是本工具產生的（沒有 manifest），為避免覆蓋請改用其他 PackFolderName：" + packDir);
+            throw new InvalidOperationException("The pack folder exists but was not created by this tool (no manifest). Choose another PackFolderName to avoid overwriting it: " + packDir);
         }
 
         var plan = Plan(onlyIds);
         if (onlyIds != null && previous != null)
         {
-            // 部分建置：保留其他模組上次的輸出。
-            throw new InvalidOperationException("階段 1 只支援完整建置（不指定 mod_ids）。");
+            // Partial builds would have to keep the other mods' previous output.
+            throw new InvalidOperationException("Only full builds are supported (no mod_ids).");
         }
 
         var outputs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -164,11 +167,11 @@ public sealed class PackBuilder
         foreach (var (rel, items) in plan.Files.OrderBy(k => k.Key, StringComparer.Ordinal))
         {
             var content = LanguageDataWriter.Render(items.Select(x => new LanguageDataWriter.Item(x.Entry.InjectionPath, x.Record.Text, x.Entry.Source)));
-            // 寫出前自我檢查：必須能被安全 XML 解析器讀回，且鍵與值一致。
+            // Self-check before writing: the safe XML parser must read it back with the same number of entries.
             var check = SafeXml.Parse(content);
             if (check.Root == null || check.Root.Elements().Count() != items.Count)
             {
-                throw new InvalidOperationException("產生的 XML 自我檢查失敗：" + rel);
+                throw new InvalidOperationException("Generated XML failed the self-check: " + rel);
             }
             outputs[rel] = content;
             foreach (var (record, entry) in items)
@@ -241,8 +244,9 @@ public sealed class PackBuilder
             pack_active = packMod?.Active ?? false,
             load_order_ok = packMod == null || !packMod.Active ? (bool?)null : packMod.LoadOrder > lastTranslated,
             next_step = packMod?.Active == true
-                ? (packMod.LoadOrder > lastTranslated ? "重新啟動遊戲即可載入。" : "翻譯包的載入順序必須在所有被翻譯模組之後，請在模組清單中調整。")
-                : "請在遊戲模組清單啟用「" + _config.PackDisplayName + "」，並放在所有被翻譯模組之後；遊戲語言需為繁體中文。",
+                ? (packMod.LoadOrder > lastTranslated ? "Restart the game to load it." : "The pack must load after every translated mod; fix the order in the mod list.")
+                : "Enable \"" + _config.EffectivePackDisplayName + "\" in the mod list, after every translated mod, with the game language set to " + _config.TargetLanguage + ".",
+            target_language = _config.TargetLanguage,
             hashes,
         };
     }
@@ -261,7 +265,7 @@ public sealed class PackBuilder
                 }
             }
         }
-        // 檢查已輸出的翻譯包檔案：XML 合法、鍵不重複、無 TODO。
+        // Check the pack files already written: valid XML, no duplicate keys, no TODO.
         var packProblems = new List<string>();
         var manifestPath = Path.Combine(_config.PackDir, ManifestName);
         if (File.Exists(manifestPath))
@@ -278,7 +282,7 @@ public sealed class PackBuilder
                 var p = Path.Combine(_config.PackDir, rel);
                 if (!File.Exists(p))
                 {
-                    packProblems.Add("缺少檔案：" + rel);
+                    packProblems.Add("Missing file: " + rel);
                     continue;
                 }
                 try
@@ -291,17 +295,17 @@ public sealed class PackBuilder
                         var k = isKeyed ? e.Name.LocalName : defType + ":" + e.Name.LocalName;
                         if (!(isKeyed ? keyedKeys.Add(k) : defKeys.Add(k)))
                         {
-                            packProblems.Add("重複鍵：" + k + "（" + rel + "）");
+                            packProblems.Add("Duplicate key: " + k + " (" + rel + ")");
                         }
                         if (e.Value == "TODO" || e.Value.Length == 0)
                         {
-                            packProblems.Add("空值或 TODO：" + k);
+                            packProblems.Add("Empty value or TODO: " + k);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    packProblems.Add("XML 無法解析：" + rel + "：" + ex.Message);
+                    packProblems.Add("XML cannot be parsed: " + rel + ": " + ex.Message);
                 }
             }
         }
@@ -321,8 +325,8 @@ public sealed class PackBuilder
         var sb = new StringBuilder();
         sb.Append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ModMetaData>\n");
         sb.Append("  <packageId>").Append(SecurityElement.Escape(_config.PackPackageId)).Append("</packageId>\n");
-        sb.Append("  <name>").Append(SecurityElement.Escape(_config.PackDisplayName)).Append("</name>\n");
-        sb.Append("  <author>RimWorld Agent Translation（使用者本機產生）</author>\n");
+        sb.Append("  <name>").Append(SecurityElement.Escape(_config.EffectivePackDisplayName)).Append("</name>\n");
+        sb.Append("  <author>RimWorld Agent Translation (generated locally)</author>\n");
         sb.Append("  <supportedVersions>\n    <li>").Append(_env.Version).Append("</li>\n  </supportedVersions>\n");
         if (mods.Count > 0)
         {
@@ -333,21 +337,23 @@ public sealed class PackBuilder
             }
             sb.Append("  </loadAfter>\n");
         }
-        sb.Append("  <description>由 AI Agent 經 rwat 工具產生的繁體中文翻譯包（機器翻譯，未經人工校對）。\n\n")
-          .Append("【重要】此模組必須放在所有被翻譯模組之後載入，否則翻譯可能無效。\n")
-          .Append("不修改任何原始模組；刪除此模組即可完全移除翻譯。\n\n")
-          .Append("翻譯模組：").Append(mods.Count).Append(" 個</description>\n");
+        var tc = _config.IsTraditional;
+        sb.Append("  <description>")
+          .Append(tc ? "由 AI Agent 經 rwat 工具產生的繁體中文翻譯包（機器翻譯，未經人工校對）。\n\n【重要】此模組必須放在所有被翻譯模組之後載入。\n不修改任何原始模組；刪除此模組即可完全移除翻譯。\n\n翻譯模組："
+                     : "由 AI Agent 经 rwat 工具生成的简体中文翻译包（机器翻译，未经人工校对）。\n\n【重要】此模组必须放在所有被翻译模组之后加载。\n不修改任何原始模组；删除此模组即可完全移除翻译。\n\n翻译模组：")
+          .Append(mods.Count)
+          .Append("\n\nMachine translation generated locally by an AI agent through rwat. Load after every translated mod.</description>\n");
         sb.Append("</ModMetaData>\n");
         return sb.ToString();
     }
 
     private string Readme()
     {
-        return "此資料夾由 rwat（RimWorld Agent Translation）自動產生，請勿手動修改，下次建置會被覆寫。\n\n"
-            + "載入順序：本翻譯包必須放在所有被翻譯模組之後。About.xml 已列出 loadAfter，遊戲的自動排序會照做。\n"
-            + "遊戲語言：需設定為繁體中文（ChineseTraditional）。\n"
-            + "內容來源：譯文由使用者所選的 AI Agent 產生；被翻譯的模組文字曾送往該 Agent 的服務供應商。\n"
-            + "移除：直接刪除此資料夾即可，不影響任何原始模組。\n";
+        return "Generated by rwat (RimWorld Agent Translation). Do not edit by hand; the next build overwrites it.\n\n"
+            + "Load order: this pack must load after every translated mod. About.xml lists them in loadAfter, which the game's auto-sort follows.\n"
+            + "Game language: " + _config.TargetLanguage + ".\n"
+            + "Content: translations were produced by the AI agent the user chose; the translated mod text was sent to that agent's provider.\n"
+            + "Removal: delete this folder. No original mod is changed.\n";
     }
 
     private static string SafeRelative(string rel)

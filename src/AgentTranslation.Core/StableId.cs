@@ -5,10 +5,10 @@ using System.Text;
 namespace AgentTranslation.Core
 {
     /// <summary>
-    /// 穩定 ID。
+    /// Stable IDs.
     /// key = H(packageId, kind, path)；id = H(packageId, kind, path, normalize(source))。
-    /// 雜湊輸入以 U+0000 分隔、UTF-8 編碼、SHA-256 取前 16 bytes、RFC 4648 base32 小寫無填充（26 字元）。
-    /// 這些規則一旦發布就不能改，否則所有既有翻譯都會被判定為過期。
+    /// Hash input: parts joined with U+0000, UTF-8, SHA-256, first 16 bytes, RFC 4648 base32 lower-case without padding (26 chars).
+    /// These rules must never change after release, or every existing translation would be treated as stale.
     /// </summary>
     public static class StableId
     {
@@ -24,7 +24,7 @@ namespace AgentTranslation.Core
             return Hash(PackageIds.Normalize(packageId), EntryKindNames.ToId(kind), canonicalPath, NormalizeSource(source));
         }
 
-        /// <summary>只統一換行字元，不做其他改寫。</summary>
+        /// <summary>Only normalises line endings; nothing else is rewritten.</summary>
         public static string NormalizeSource(string source)
         {
             return (source ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');

@@ -8,22 +8,22 @@ using AgentTranslation.Core;
 
 namespace AgentTranslation.Server;
 
-/// <summary>一個遊戲術語：官方簡中 → 官方繁中，與 OpenCC 結果不同者才收錄。</summary>
+/// <summary>One game term: official Simplified -> official Traditional, kept only where it differs from OpenCC.</summary>
 public sealed class GlossaryTerm
 {
     public string Simplified { get; init; } = string.Empty;
-    /// <summary>官方繁中寫法與出現次數，次數多者在前。</summary>
+    /// <summary>Official Traditional spellings with their counts, most frequent first.</summary>
     public List<(string Text, int Count)> Traditional { get; init; } = new();
     public string OpenCcResult { get; init; } = string.Empty;
     public string Example { get; init; } = string.Empty;
-    /// <summary>官方有兩種以上寫法，且次要寫法占比不低。</summary>
+    /// <summary>The official data uses two or more spellings and the second one is not rare.</summary>
     public bool Conflicting => Traditional.Count > 1 && Traditional[1].Count * 4 >= Traditional[0].Count;
 }
 
 /// <summary>
-/// OpenCC 字典（內嵌資源）與官方語言包術語表。
-/// 官方術語表來源：Data/*/Languages 下的 ChineseSimplified 與 ChineseTraditional .tar（遊戲本身附帶），
-/// 以相同鍵配對；只取 2–8 字、純中文、繁簡長度相同、且 OpenCC 轉換結果與官方繁中不同的短詞（多為 Def 名稱）。
+/// Embedded OpenCC dictionaries and the glossary derived from the official language packs.
+/// Official data: the ChineseSimplified and ChineseTraditional .tar files under Data/*/Languages (shipped with the game),
+/// paired by key. Only short terms are used for the glossary: 2-8 characters, all CJK, same length in both scripts.
 /// </summary>
 public sealed class ChineseResources
 {
@@ -35,19 +35,24 @@ public sealed class ChineseResources
     private PhraseDictionary[] _tw = null!;
     private PhraseDictionary _norm = null!;
 
-    /// <summary>經 MCP（Agent）新增的 s2t 術語來源詞。命中這些詞的轉換不會被自動採用。</summary>
+    /// <summary>Sources of s2t terms added through MCP (by an agent). Conversions that hit them are never auto-adopted.</summary>
     public HashSet<string> AgentTerms { get; } = new(StringComparer.Ordinal);
-    /// <summary>使用者／內建 s2t 術語（簡中 → 繁中）。</summary>
+    /// <summary>User and built-in s2t terms (Simplified -> Traditional).</summary>
     public Dictionary<string, GlossaryEntry> UserTerms { get; } = new(StringComparer.Ordinal);
 
     public ChineseConverter PlainConverter { get; private set; } = null!;
-    /// <summary>官方繁中與 OpenCC 用詞不同、但不是同字異體的詞（例如 按钮→鈕扣），只在整段文字完全相同時當成校對提示。</summary>
+    /// <summary>Terms where official Traditional uses different wording, not just a script variant (e.g. 按钮 -> 鈕扣); used only as a review hint when the whole text matches.</summary>
     public Dictionary<string, GlossaryTerm> LabelHints { get; } = new(StringComparer.Ordinal);
     public ChineseConverter Converter { get; private set; } = null!;
     public Dictionary<string, GlossaryTerm> Glossary { get; } = new(StringComparer.Ordinal);
     public int OfficialPairs { get; private set; }
-    /// <summary>官方繁中翻譯（英文 → 繁中），供後續翻譯記憶使用。鍵：CanonicalPath。</summary>
+    /// <summary>Official Traditional translations keyed by CanonicalPath.</summary>
     public Dictionary<string, LanguageRecord> OfficialTraditional { get; } = new(StringComparer.Ordinal);
+    /// <summary>Official Simplified translations keyed by CanonicalPath.</summary>
+    public Dictionary<string, LanguageRecord> OfficialSimplified { get; } = new(StringComparer.Ordinal);
+
+    public Dictionary<string, LanguageRecord> OfficialFor(string language) =>
+        language == TargetLanguages.Traditional ? OfficialTraditional : OfficialSimplified;
 
     public static ChineseResources Load(string gameDir)
     {
@@ -55,7 +60,7 @@ public sealed class ChineseResources
         var asm = typeof(ChineseResources).Assembly;
         PhraseDictionary D(string name)
         {
-            using var s = asm.GetManifestResourceStream("opencc/" + name + ".txt") ?? throw new InvalidOperationException("缺少內嵌資源 " + name);
+            using var s = asm.GetManifestResourceStream("opencc/" + name + ".txt") ?? throw new InvalidOperationException("Missing embedded resource " + name);
             using var reader = new StreamReader(s, Encoding.UTF8);
             return PhraseDictionary.Parse(reader);
         }
@@ -65,12 +70,12 @@ public sealed class ChineseResources
         var norm = D("CJK_Compatibility_Ideographs");
         r.PlainConverter = new ChineseConverter(stPhrases, stChars, tw, null, norm);
 
-        // 完整簡體專用字集合：候選（含經台灣異體字轉換後的結果）中不含自己者。
-        // 例：群→羣，台灣異體字再轉回 群，所以 群 不算簡體字。
+        // Full Simplified-only set: characters whose candidates (including their Taiwan variants) never include themselves.
+        // Example: 群 -> 羣, and the Taiwan variant table maps 羣 back to 群, so 群 is not Simplified-only.
         var simplifiedOnly = new List<char>();
         r._twVariants = tw[2];
         r._stCharacters = stChars;
-        foreach (var key in r.AllCharacterKeys())
+        foreach (var key in stChars.Keys.Where(k => k.Length == 1))
         {
             if (!r.AllowedTraditional(key).Contains(key))
             {
@@ -78,6 +83,20 @@ public sealed class ChineseResources
             }
         }
         SimplifiedChars.UseSet(simplifiedOnly);
+
+        // Full Traditional-only set: TSCharacters keys whose Simplified candidates never include themselves,
+        // and which are not themselves a valid Simplified form of something (e.g. 乾 -> 干/乾 stays allowed).
+        var ts = D("TSCharacters");
+        var simplifiedTargets = new HashSet<string>(stChars.Keys, StringComparer.Ordinal);
+        var traditionalOnly = new List<char>();
+        foreach (var key in ts.Keys.Where(k => k.Length == 1))
+        {
+            if (ts.TryGet(key, out var cands) && !cands.Contains(key) && !simplifiedTargets.Contains(key))
+            {
+                traditionalOnly.Add(key[0]);
+            }
+        }
+        TraditionalChars.UseSet(traditionalOnly);
 
         r._stPhrases = stPhrases;
         r._tw = tw;
@@ -87,7 +106,7 @@ public sealed class ChineseResources
         return r;
     }
 
-    /// <summary>重建轉換器：官方同字異體術語（無衝突者）＋ 使用者 s2t 術語（優先）。</summary>
+    /// <summary>Rebuilds the converter: official script-variant terms (non-conflicting) plus user s2t terms (which win).</summary>
     public void ApplyUserGlossary(IEnumerable<GlossaryEntry> entries)
     {
         var glossaryDict = new PhraseDictionary();
@@ -128,20 +147,18 @@ public sealed class ChineseResources
             foreach (var tar in Directory.GetFiles(langs, "*.tar"))
             {
                 var name = Path.GetFileName(tar);
-                Dictionary<string, string>? target = name.StartsWith("ChineseSimplified", StringComparison.Ordinal) ? sc
-                    : name.StartsWith("ChineseTraditional", StringComparison.Ordinal) ? tc : null;
-                if (target == null)
+                var isSc = name.StartsWith(TargetLanguages.Simplified, StringComparison.Ordinal);
+                var isTc = name.StartsWith(TargetLanguages.Traditional, StringComparison.Ordinal);
+                if (!isSc && !isTc)
                 {
                     continue;
                 }
+                var target = isSc ? sc : tc;
+                var official = isSc ? OfficialSimplified : OfficialTraditional;
                 foreach (var rec in LanguageFileReader.Read(TarFiles(tar)))
                 {
-                    var key = Path.GetFileName(dlc) + "|" + rec.CanonicalPath;
-                    target[key] = rec.Text;
-                    if (target == tc)
-                    {
-                        OfficialTraditional[rec.CanonicalPath] = rec;
-                    }
+                    target[Path.GetFileName(dlc) + "|" + rec.CanonicalPath] = rec.Text;
+                    official[rec.CanonicalPath] = rec;
                 }
             }
         }
@@ -173,8 +190,8 @@ public sealed class ChineseResources
         {
             var open = PlainConverter.Convert(term).Text;
             var all = byTc.OrderByDescending(x => x.Value).ThenBy(x => x.Key, StringComparer.Ordinal).Select(x => (x.Key, x.Value)).ToList();
-            // 同字異體（逐字可對應）的寫法才能拿來修正 OpenCC 的一對多選擇；
-            // 其他是「翻譯用詞不同」，只作為整段相同時的校對提示，不做子字串替換。
+            // Only script-compatible spellings (character-by-character) may correct OpenCC's one-to-many choice;
+            // the rest are different wording and serve only as a whole-text review hint, never as substring replacement.
             var compatible = all.Where(x => IsScriptCompatible(term, x.Key)).ToList();
             var other = all.Where(x => !IsScriptCompatible(term, x.Key)).ToList();
             if (compatible.Count > 0 && !(compatible.Count == 1 && compatible[0].Key == open))
@@ -188,9 +205,7 @@ public sealed class ChineseResources
         }
     }
 
-    private IEnumerable<string> AllCharacterKeys() => _stCharacters.Keys.Where(k => k.Length == 1);
-
-    /// <summary>一個簡體字可接受的繁體寫法：本身、OpenCC 候選、以及兩者經台灣異體字表轉換後的結果。</summary>
+    /// <summary>Acceptable Traditional forms of a Simplified character: itself, the OpenCC candidates, and their Taiwan variants.</summary>
     public HashSet<string> AllowedTraditional(string ch)
     {
         var set = new HashSet<string>(StringComparer.Ordinal);
@@ -219,7 +234,7 @@ public sealed class ChineseResources
         return set;
     }
 
-    /// <summary>官方繁中詞是否只是簡中詞的逐字轉換（每個字都在可接受寫法內）。</summary>
+    /// <summary>Whether an official Traditional term is a plain character-by-character conversion of the Simplified one.</summary>
     public bool IsScriptCompatible(string simplified, string traditional)
     {
         if (simplified.Length != traditional.Length)
@@ -236,7 +251,7 @@ public sealed class ChineseResources
         return true;
     }
 
-    /// <summary>簡中原文中出現、但官方有多種繁中寫法的術語。</summary>
+    /// <summary>Official terms present in the Simplified text that have more than one official Traditional spelling.</summary>
     public List<GlossaryTerm> ConflictingTermsIn(string simplified)
     {
         return Glossary.Values.Where(t => t.Conflicting && simplified.Contains(t.Simplified, StringComparison.Ordinal)).ToList();

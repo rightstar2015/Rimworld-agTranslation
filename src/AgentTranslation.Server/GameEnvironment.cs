@@ -10,7 +10,7 @@ public sealed class InstalledMod
 {
     public required ModAbout About { get; init; }
     public required string Source { get; init; } // official / local / workshop
-    /// <summary>在 ModsConfig 中的位置；未啟用為 -1。</summary>
+    /// <summary>Position in ModsConfig; -1 when not active.</summary>
     public int LoadOrder { get; set; } = -1;
     public bool Active => LoadOrder >= 0;
     public string PackageId => About.PackageId;
@@ -18,18 +18,18 @@ public sealed class InstalledMod
 }
 
 /// <summary>
-/// 遊戲環境快照：版本、語言、已安裝與啟用的模組。只讀取檔案，不碰遊戲行程。
-/// 已對照本機 1.7.4998：設定檔位於 LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Config，
-/// ModsConfig.xml 的 activeMods/li 順序即載入順序；Prefs.xml 的 langFolderName 為目前語言。
+/// Snapshot of the game environment: version, language, installed and active mods. Reads files only; never touches the game process.
+/// Checked against the local 1.7.4998: config lives in LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Config,
+/// the order of ModsConfig.xml activeMods/li is the load order, and Prefs.xml langFolderName is the current language.
 /// </summary>
 public sealed class GameEnvironment
 {
     private GameEnvironment() { }
 
     public string GameDir { get; private set; } = string.Empty;
-    /// <summary>完整版本字串，例如 "1.7.4998 rev1299"。</summary>
+    /// <summary>Full version string, e.g. "1.7.4998 rev1299".</summary>
     public string VersionFull { get; private set; } = string.Empty;
-    /// <summary>主.次版本，例如 "1.7"，用於版本資料夾。</summary>
+    /// <summary>Major.minor, e.g. "1.7", used for version folders.</summary>
     public string Version { get; private set; } = string.Empty;
     public string? Language { get; private set; }
     public List<InstalledMod> Mods { get; } = new();
@@ -103,7 +103,7 @@ public sealed class GameEnvironment
         for (int i = 0; i < env.ActiveIds.Count; i++)
         {
             var id = env.ActiveIds[i];
-            // 本機 Mods 優先於工坊（遊戲對同 packageId 的取用細節【未確認】，此處採本機優先）。
+            // Local Mods win over Workshop copies (how the game picks between the same packageId is [unverified]; local first here).
             var mod = env.Mods.Where(m => m.PackageId == id || PackageIds.WithoutPostfix(m.PackageId) == PackageIds.WithoutPostfix(id))
                 .OrderBy(m => m.Source == "official" ? 0 : m.Source == "local" ? 1 : 2)
                 .FirstOrDefault(m => !m.Active);

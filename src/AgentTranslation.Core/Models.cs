@@ -3,12 +3,12 @@ using System.Collections.Generic;
 
 namespace AgentTranslation.Core
 {
-    /// <summary>條目類型。數值與名稱會進入穩定 ID 的雜湊輸入，發布後不可更改。</summary>
+    /// <summary>Entry kind. Its numeric value and name feed the stable ID hash and must never change after release.</summary>
     public enum EntryKind
     {
-        /// <summary>Languages/English/Keyed 的鍵值。</summary>
+        /// <summary>A key/value from Languages/English/Keyed.</summary>
         Keyed,
-        /// <summary>由 Defs XML 抽出、以 DefInjected 格式輸出的欄位。</summary>
+        /// <summary>A field extracted from Defs XML and written in DefInjected format.</summary>
         Def,
     }
 
@@ -35,7 +35,7 @@ namespace AgentTranslation.Core
         }
     }
 
-    /// <summary>一筆待翻譯的來源條目。由抽取器產生，內容是不可信的模組文字。</summary>
+    /// <summary>One source entry to translate. Produced by the extractors; its content is untrusted mod text.</summary>
     public sealed class SourceEntry
     {
         public SourceEntry(string packageId, EntryKind kind, string? defType, string injectionPath, string source, string sourceFile)
@@ -51,29 +51,51 @@ namespace AgentTranslation.Core
             Id = StableId.Id(PackageId, kind, CanonicalPath, source);
         }
 
-        /// <summary>小寫的 packageId。</summary>
+        /// <summary>Lower-case packageId.</summary>
         public string PackageId { get; }
         public EntryKind Kind { get; }
-        /// <summary>Def 類型名稱（例如 ThingDef），Keyed 時為 null。</summary>
+        /// <summary>Def type name (e.g. ThingDef); null for Keyed.</summary>
         public string? DefType { get; }
-        /// <summary>Keyed：鍵名；Def：defName.field.0.field 形式的 DefInjected 路徑。</summary>
+        /// <summary>Keyed: the key; Def: the DefInjected path in defName.field.0.field form.</summary>
         public string InjectionPath { get; }
-        /// <summary>參與雜湊的路徑：Keyed 為鍵名；Def 為 "DefType:路徑"。</summary>
+        /// <summary>Path that feeds the hash: the key for Keyed; "DefType:path" for Def.</summary>
         public string CanonicalPath { get; }
-        /// <summary>原文（XML 原樣，字面 \n 保留為兩個字元）。</summary>
+        /// <summary>Source text (as in the XML; a literal \n stays as two characters).</summary>
         public string Source { get; }
-        /// <summary>來源檔，相對於模組根目錄，使用 '/' 分隔。</summary>
+        /// <summary>Source file, relative to the mod root, '/'-separated.</summary>
         public string SourceFile { get; }
         public string Key { get; }
         public string Id { get; }
 
-        /// <summary>所屬 Def 的 label（上下文用，可能為 null）。</summary>
+        /// <summary>Label of the owning Def (context only; may be null).</summary>
         public string? DefLabel { get; set; }
-        /// <summary>所屬 Def 的 description（上下文用，可能為 null）。</summary>
+        /// <summary>Description of the owning Def (context only; may be null).</summary>
         public string? DefDescription { get; set; }
+
+        /// <summary>
+        /// Other names under which a DefInjected translation of this entry takes effect: every class in the Def's
+        /// inheritance chain (a Def is added to the database of each of them), short and full forms. Not part of the ID.
+        /// </summary>
+        public IReadOnlyList<string> DefTypeAliases { get; set; } = Array.Empty<string>();
+
+        /// <summary>CanonicalPath under every accepted Def type name (just CanonicalPath for Keyed).</summary>
+        public IEnumerable<string> CanonicalPathCandidates
+        {
+            get
+            {
+                yield return CanonicalPath;
+                if (Kind == EntryKind.Def)
+                {
+                    foreach (var alias in DefTypeAliases)
+                    {
+                        yield return alias + ":" + InjectionPath;
+                    }
+                }
+            }
+        }
     }
 
-    /// <summary>抽取時遇到、但不影響其他條目的問題。</summary>
+    /// <summary>A problem met during extraction that does not affect other entries.</summary>
     public sealed class ScanNote
     {
         public ScanNote(string code, string detail, string? file = null)
@@ -96,7 +118,7 @@ namespace AgentTranslation.Core
 
     public static class PackageIds
     {
-        /// <summary>RimWorld 比對 packageId 時不分大小寫；另外去掉同名衝突時加上的 _steam／_copy 後綴。</summary>
+        /// <summary>RimWorld compares packageIds case-insensitively; also strips the _steam/_copy postfix added on name clashes.</summary>
         public static string Normalize(string packageId)
         {
             var id = (packageId ?? string.Empty).Trim().ToLowerInvariant();

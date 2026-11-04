@@ -10,16 +10,16 @@ using AgentTranslation.Core;
 namespace AgentTranslation.Server;
 
 /// <summary>
-/// 掃描結果的磁碟快取（工作資料夾 cache/scan/&lt;packageId&gt;.json）。只快取「抽取」的結果；
-/// 「是否已被其他模組翻譯」每次依目前狀態重新判斷。
+/// Disk cache of scan results (work folder cache/scan/&lt;packageId&gt;.json). Only the extraction is cached;
+/// "already translated by another mod" is decided again every time from the current state.
 ///
-/// 指紋包含：快取格式版本、遊戲版本與 Assembly-CSharp、啟用模組清單與順序、每個啟用模組的 About.xml（大小與時間），
-/// 以及本模組載入資料夾下 Defs、Languages/English、Assemblies 每個檔案的路徑、大小、修改時間。
-/// 已知限制：依賴模組只改 Defs 而 About.xml 不變時（父節點內容改變），指紋不會變；scan_mod 一律強制重掃。
+/// The fingerprint covers: cache format version, game version and Assembly-CSharp, the active mod list and order, every active
+/// mod's About.xml (size and time), and path, size and time of every file under this mod's Defs, Languages/English and Assemblies.
+/// Known limit: if a dependency changes only its Defs (parent content) without touching About.xml, the fingerprint does not change; scan_mod always forces a rescan.
 /// </summary>
 public static class ScanCache
 {
-    private const string FormatVersion = "scan-cache-1";
+    private const string FormatVersion = "scan-cache-2";
     private const long MaxBytes = 64L * 1024 * 1024;
 
     private sealed class EntryDto
@@ -31,6 +31,7 @@ public static class ScanCache
         public string File { get; set; } = string.Empty;
         public string? Label { get; set; }
         public string? Description { get; set; }
+        public List<string>? Aliases { get; set; }
     }
 
     private sealed class NoteDto
@@ -114,7 +115,7 @@ public static class ScanCache
                 {
                     return null;
                 }
-                result.Entries.Add(new SourceEntry(packageId, kind, e.DefType, e.Path, e.Source, e.File) { DefLabel = e.Label, DefDescription = e.Description });
+                result.Entries.Add(new SourceEntry(packageId, kind, e.DefType, e.Path, e.Source, e.File) { DefLabel = e.Label, DefDescription = e.Description, DefTypeAliases = e.Aliases ?? new List<string>() });
             }
             foreach (var n in file.Notes)
             {
@@ -143,6 +144,7 @@ public static class ScanCache
                 File = e.SourceFile,
                 Label = e.DefLabel,
                 Description = e.DefDescription,
+                Aliases = e.DefTypeAliases.Count > 0 ? e.DefTypeAliases.ToList() : null,
             }).ToList(),
             Notes = result.Notes.Select(n => new NoteDto { Code = n.Code, Detail = n.Detail, File = n.File }).ToList(),
         };
@@ -152,7 +154,7 @@ public static class ScanCache
         }
         catch (IOException)
         {
-            // 快取寫入失敗不影響結果。
+            // A failed cache write does not affect the result.
         }
     }
 }

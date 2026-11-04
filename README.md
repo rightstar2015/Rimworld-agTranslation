@@ -1,34 +1,65 @@
-# RimWorld Agent Translation（開發中，階段 1）
+# RimWorld Agent Translation (work in progress)
 
-讓支援 MCP 的 AI Agent 為 RimWorld 1.7 模組產出繁體中文翻譯包。本工具不呼叫任何 AI 服務、不需要 API Key；翻譯由你使用的 Agent 完成，本工具負責抽取、驗證與寫出。
+Lets any MCP-capable AI agent produce Chinese translation packs for RimWorld 1.7 mods, in Simplified Chinese (default) or Traditional Chinese (Taiwan usage).
 
-> 被翻譯的模組文字會被送到你所選 Agent 的服務供應商。
+This tool never calls an AI service and needs no API key. The agent you already use does the translating; this tool scans mods, extracts text, supplies context, translation memory and glossary, validates results and writes a standard translation pack. Original mods are never modified.
 
-## 建置
+> Privacy: the mod text being translated is sent to the provider of the agent you choose.
+
+## What it does
+
+- Finds untranslated text (Keyed and DefInjected, with Defs inheritance resolved). Existing translations for the target language, including those from translation patch mods, count as translated and are never overwritten.
+- Gives the agent memory with every batch: official game translations and other mods' existing translations of the same English, so wording stays consistent with what you already have.
+- Validates every submission: placeholders, markup and newlines must match; characters of the other Chinese script are rejected; empty, untranslated and oddly sized results are flagged.
+- Writes a separate pack mod (`!AgentTranslation_Pack`) that loads after the translated mods. Deleting it removes every translation.
+- Traditional mode can also reuse existing Simplified translations converted with OpenCC (Apache-2.0 dictionaries, embedded).
+
+## Build
 
 ```bash
 dotnet test
+```
+
+```bash
 dotnet publish src/AgentTranslation.Server -c Release
 ```
 
-## 在 MCP Client 中使用
+## Use with an MCP client
 
-指令：`rwat serve`（stdio）。範例（Claude Code）：
+The server speaks MCP over stdio: `rwat serve`. Example for Claude Code:
 
 ```bash
 claude mcp add rimworld-translation -- "C:\path\to\rwat.exe" serve
 ```
 
-## 離線模式
+Tools: `get_environment`, `list_mods`, `scan_mod`, `get_batch`, `submit_translations`, `validate_pack`, `build_pack`, `query_memory`, `glossary_get`, `glossary_add`, `adopt_simplified`. None of them runs commands, reads arbitrary files or accesses the network.
+
+## Offline mode
 
 ```bash
 rwat export <packageId> --out batch.json
+```
+
+```bash
 rwat import batch-result.json
+```
+
+```bash
 rwat build
 ```
 
-設定檔：`%LOCALAPPDATA%\RimWorldAgentTranslation\config.json`（環境變數 `RWAT_WORK_DIR` 可改位置）。
+## Configuration
 
-文件：`docs/STAGE0_PROPOSAL.md`（架構）、`DESIGN_NOTES.md`（設計規則）、`docs/STAGE1_REPORT.md`（目前進度）。
+`%LOCALAPPDATA%\RimWorldAgentTranslation\config.json` (move the work folder with `RWAT_WORK_DIR`). Main settings:
 
-授權：MIT。設計理念參考 RimWorld-Auto-AI-Translation-Core（未使用其程式碼）。
+| Setting | Default | Meaning |
+|---|---|---|
+| `target_language` | `ChineseSimplified` | `ChineseSimplified` or `ChineseTraditional` |
+| `pack_output_dir` | game `Mods` folder | Where the pack folder is written (`RWAT_PACK_OUTPUT_DIR` overrides) |
+| `simplified_auto_adopt.enabled` | `false` | Lets existing Simplified translations be adopted automatically under the conditions you set |
+
+Only you edit this file; MCP tools cannot change it.
+
+## License
+
+MIT. Design ideas from RimWorld-Auto-AI-Translation-Core; none of its code is used. OpenCC dictionary data is Apache-2.0 (see `src/AgentTranslation.Server/Data/opencc/NOTICE.md`).

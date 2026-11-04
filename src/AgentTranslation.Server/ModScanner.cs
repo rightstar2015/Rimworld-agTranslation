@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,23 +7,25 @@ using AgentTranslation.Core;
 
 namespace AgentTranslation.Server;
 
-/// <summary>一個模組的掃描結果。</summary>
+/// <summary>Scan result of one mod.</summary>
 public sealed class ModScan
 {
     public required InstalledMod Mod { get; init; }
     public List<SourceEntry> Entries { get; init; } = new();
     public List<ScanNote> Notes { get; init; } = new();
-    /// <summary>已有其他來源（含模組自身）提供繁中翻譯的條目 id。</summary>
+    /// <summary>Ids of entries that already have a target-language translation from another source (including the mod itself).</summary>
     public HashSet<string> AlreadyTranslated { get; init; } = new(StringComparer.Ordinal);
-    /// <summary>同一個 Def 已被其他翻譯以可能不同的路徑寫法觸及，保守起見不輸出。</summary>
+    /// <summary>The same Def is already touched by another translation, possibly with a different path form; not emitted, to be safe.</summary>
     public HashSet<string> Ambiguous { get; init; } = new(StringComparer.Ordinal);
     public Dictionary<string, SourceEntry> ById { get; init; } = new(StringComparer.Ordinal);
+    /// <summary>Entries whose source text is already written in the target language (e.g. a Chinese mod's Defs in Simplified mode).</summary>
+    public HashSet<string> SourceInTarget { get; init; } = new(StringComparer.Ordinal);
 
-    public IEnumerable<SourceEntry> Translatable => Entries.Where(e => !AlreadyTranslated.Contains(e.Id) && !Ambiguous.Contains(e.Id));
+    public IEnumerable<SourceEntry> Translatable => Entries.Where(e => !AlreadyTranslated.Contains(e.Id) && !Ambiguous.Contains(e.Id) && !SourceInTarget.Contains(e.Id));
 }
 
 /// <summary>
-/// 掃描模組：解析載入資料夾、Defs 繼承、型別中繼資料，抽出待翻譯條目。只讀取檔案。
+/// Scans a mod: resolves load folders, Defs inheritance and type metadata, and extracts entries to translate. Reads files only.
 /// </summary>
 public sealed class ModScanner : IDisposable
 {
@@ -46,7 +48,7 @@ public sealed class ModScanner : IDisposable
         }
         if (!File.Exists(core))
         {
-            throw new InvalidOperationException("找不到 Assembly-CSharp.dll，無法判斷欄位是否可翻譯。");
+            throw new InvalidOperationException("Assembly-CSharp.dll not found; cannot tell which fields are translatable.");
         }
         _schema.AddAssembly(core);
     }
@@ -70,7 +72,7 @@ public sealed class ModScanner : IDisposable
             extracted = Extract(mod);
             if (!_allAssembliesLoaded && extracted.Notes.Any(n => n.Code == "unknown_class" || n.Code == "unknown_def_type"))
             {
-                // Class 可能定義在依賴模組中：載入所有啟用模組的組件後重掃一次。
+                // The Class may live in a dependency: load the assemblies of all active mods and scan again.
                 foreach (var m in _env.ActiveMods)
                 {
                     LoadModAssemblies(m);
@@ -85,7 +87,7 @@ public sealed class ModScanner : IDisposable
         return scan;
     }
 
-    /// <summary>丟棄記憶體與磁碟快取，下次 Scan 一定重新抽取。</summary>
+    /// <summary>Drops the memory and disk cache so the next Scan extracts again.</summary>
     public void Invalidate(string packageId)
     {
         var id = PackageIds.Normalize(packageId);
@@ -98,7 +100,7 @@ public sealed class ModScanner : IDisposable
         var result = new ExtractionResult();
         var folders = _env.LoadFoldersFor(mod);
 
-        // Keyed（英文）
+        // Keyed (English)
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var lang in new[] { "English" })
         {
@@ -133,7 +135,7 @@ public sealed class ModScanner : IDisposable
             result.Notes.Add(new ScanNote("parent_not_found", w));
         }
 
-        // 同一路徑只保留一筆（後定義者覆蓋，與 DefDatabase 同 defName 後者覆蓋的行為一致【未確認】）。
+        // Keep one entry per path (the later definition wins, as DefDatabase does for a repeated defName [unverified]).
         var entries = new List<SourceEntry>();
         var byPath = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var e in result.Entries)
@@ -163,7 +165,7 @@ public sealed class ModScanner : IDisposable
         return final;
     }
 
-    /// <summary>依目前所有啟用模組的繁中翻譯，標記已翻譯／路徑寫法可能衝突的條目。</summary>
+    /// <summary>Marks entries already translated, or touched with a possibly different path form, by the target-language translations of all active mods.</summary>
     private ModScan Classify(InstalledMod mod, ExtractionResult extracted)
     {
         var existing = Existing();
@@ -179,11 +181,32 @@ public sealed class ModScanner : IDisposable
             {
                 scan.Ambiguous.Add(e.Id);
             }
+            else if (IsInTargetLanguage(e.Source))
+            {
+                scan.SourceInTarget.Add(e.Id);
+            }
         }
         return scan;
     }
 
-    /// <summary>所有啟用模組（不含本翻譯包）中已存在的目標語言翻譯。</summary>
+    private static readonly System.Text.RegularExpressions.Regex LatinWord = new(@"[A-Za-z]{3,}", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Whether a source text is already written in the target language: it has Chinese characters, no Latin word of three
+    /// or more letters (outside tokens), and no character that only exists in the other script.
+    /// </summary>
+    private bool IsInTargetLanguage(string source)
+    {
+        var text = Tokens.StripTokens(source);
+        if (!text.Any(c => c >= 0x3400 && c <= 0x9FFF) || LatinWord.IsMatch(text))
+        {
+            return false;
+        }
+        var wrong = _config.IsTraditional ? SimplifiedChars.FindIn(text) : TraditionalChars.FindIn(text);
+        return wrong.Count == 0;
+    }
+
+    /// <summary>Target-language translations that already exist in all active mods (excluding this pack).</summary>
     public ExistingTranslationIndex Existing()
     {
         if (_existing != null)
@@ -261,7 +284,7 @@ public sealed class ModScanner : IDisposable
     public void Dispose() => _schema.Dispose();
 
     /// <summary>
-    /// 找父節點：先找本模組，再找官方資料（Core 與 DLC），最後才逐一載入其他載入順序較前的模組。
+    /// Finds parents: this mod first, then official data (Core and DLCs), and only then other mods earlier in the load order, one by one.
     /// </summary>
     private sealed class NodeSource : INamedNodeSource
     {

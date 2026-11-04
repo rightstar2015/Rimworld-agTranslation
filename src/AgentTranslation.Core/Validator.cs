@@ -19,21 +19,31 @@ namespace AgentTranslation.Core
 
     public sealed class ValidationOutcome
     {
-        /// <summary>不合格，不得寫入。</summary>
+        /// <summary>Rejected: must not be written.</summary>
         public List<ValidationIssue> Rejects { get; } = new List<ValidationIssue>();
-        /// <summary>可疑，寫入但列入報告。</summary>
+        /// <summary>Suspicious: written, but listed in reports.</summary>
         public List<ValidationIssue> Flags { get; } = new List<ValidationIssue>();
         public bool Accepted => Rejects.Count == 0;
     }
 
-    public sealed class ValidatorOptions
+    /// <summary>Script of the target language; decides which wrong-script characters are rejected.</summary>
+    public enum TargetScript
     {
-        /// <summary>允許譯文與原文相同的專有名詞（不分大小寫）。</summary>
-        public ISet<string> ProperNounWhitelist { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        public int MaxLength { get; set; } = 20000;
+        /// <summary>ChineseSimplified: Traditional-only characters are rejected.</summary>
+        Simplified,
+        /// <summary>ChineseTraditional (Taiwan): Simplified-only characters are rejected.</summary>
+        Traditional,
     }
 
-    /// <summary>譯文驗證。規則只能變嚴格；放寬必須附上遊戲實際接受該格式的證據。</summary>
+    public sealed class ValidatorOptions
+    {
+        /// <summary>Proper nouns allowed to stay identical to the source (case-insensitive).</summary>
+        public ISet<string> ProperNounWhitelist { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public int MaxLength { get; set; } = 20000;
+        public TargetScript Script { get; set; } = TargetScript.Simplified;
+    }
+
+    /// <summary>Translation validation. Rules may only get stricter; relaxing one needs evidence that the game accepts the format.</summary>
     public static class Validator
     {
         public static ValidationOutcome Validate(string source, string? translation, ValidatorOptions? options = null)
@@ -44,23 +54,23 @@ namespace AgentTranslation.Core
 
             if (text.Trim().Length == 0)
             {
-                outcome.Rejects.Add(new ValidationIssue("empty", "譯文是空的。"));
+                outcome.Rejects.Add(new ValidationIssue("empty", "Translation is empty."));
                 return outcome;
             }
             if (text.Length > options.MaxLength)
             {
-                outcome.Rejects.Add(new ValidationIssue("too_long", "譯文超過 " + options.MaxLength + " 字元上限。"));
+                outcome.Rejects.Add(new ValidationIssue("too_long", "Translation exceeds the " + options.MaxLength + " character limit."));
                 return outcome;
             }
 
             var badChar = FindInvalidXmlChar(text);
             if (badChar != null)
             {
-                outcome.Rejects.Add(new ValidationIssue("invalid_xml_chars", "譯文含 XML 不允許的字元 " + badChar + "。"));
+                outcome.Rejects.Add(new ValidationIssue("invalid_xml_chars", "Translation contains a character not allowed in XML: " + badChar + "."));
             }
             if (text.Trim() == "TODO")
             {
-                outcome.Rejects.Add(new ValidationIssue("placeholder_text", "遊戲會把 TODO 當成「尚未翻譯」的占位文字。"));
+                outcome.Rejects.Add(new ValidationIssue("placeholder_text", "The game treats TODO as an untranslated placeholder."));
             }
 
             foreach (var pair in Tokens.Diff(source, text))
@@ -69,25 +79,36 @@ namespace AgentTranslation.Core
                 var parts = new List<string>();
                 if (pair.Value.Missing.Count > 0)
                 {
-                    parts.Add("缺少 " + string.Join("、", pair.Value.Missing));
+                    parts.Add("missing " + string.Join(", ", pair.Value.Missing));
                 }
                 if (pair.Value.Extra.Count > 0)
                 {
-                    parts.Add("多出 " + string.Join("、", pair.Value.Extra));
+                    parts.Add("extra " + string.Join(", ", pair.Value.Extra));
                 }
-                outcome.Rejects.Add(new ValidationIssue(code, "與原文不一致：" + string.Join("；", parts) + "。"));
+                outcome.Rejects.Add(new ValidationIssue(code, "Does not match the source: " + string.Join("; ", parts) + "."));
             }
 
             var stripped = Tokens.StripTokens(text);
-            var simplified = SimplifiedChars.FindIn(stripped);
-            if (simplified.Count > 0)
+            if (options.Script == TargetScript.Traditional)
             {
-                outcome.Rejects.Add(new ValidationIssue("simplified_chars", "含簡體字：" + string.Join("", simplified.Distinct()) + "。請改用繁體（台灣用字）。"));
+                var simplified = SimplifiedChars.FindIn(stripped);
+                if (simplified.Count > 0)
+                {
+                    outcome.Rejects.Add(new ValidationIssue("simplified_chars", "Contains Simplified characters: " + string.Join("", simplified.Distinct()) + ". Use Traditional characters (Taiwan usage)."));
+                }
+            }
+            else
+            {
+                var traditional = TraditionalChars.FindIn(stripped);
+                if (traditional.Count > 0)
+                {
+                    outcome.Rejects.Add(new ValidationIssue("traditional_chars", "Contains Traditional characters: " + string.Join("", traditional.Distinct()) + ". Use Simplified characters."));
+                }
             }
 
             if (string.Equals(text.Trim(), source.Trim(), StringComparison.Ordinal) && source.Any(IsAsciiLetter) && !options.ProperNounWhitelist.Contains(source.Trim()))
             {
-                outcome.Flags.Add(new ValidationIssue("identical_to_source", "譯文與原文相同且含英文字母；若是專有名詞請加入白名單，否則請翻譯。"));
+                outcome.Flags.Add(new ValidationIssue("identical_to_source", "Translation equals the source and contains Latin letters; add proper nouns to the whitelist, otherwise translate it."));
             }
 
             var srcLen = Tokens.StripTokens(source).Trim().Length;
@@ -97,12 +118,12 @@ namespace AgentTranslation.Core
                 var ratio = (double)dstLen / srcLen;
                 if (ratio < 0.12 || ratio > 1.6)
                 {
-                    outcome.Flags.Add(new ValidationIssue("length_anomaly", "譯文長度與原文比例異常（" + ratio.ToString("0.00") + "）。"));
+                    outcome.Flags.Add(new ValidationIssue("length_anomaly", "Unusual translation/source length ratio (" + ratio.ToString("0.00") + ")."));
                 }
             }
             else if (dstLen > srcLen * 3 + 6)
             {
-                outcome.Flags.Add(new ValidationIssue("length_anomaly", "短原文的譯文過長。"));
+                outcome.Flags.Add(new ValidationIssue("length_anomaly", "Translation is too long for a short source."));
             }
 
             return outcome;
@@ -143,8 +164,8 @@ namespace AgentTranslation.Core
     }
 
     /// <summary>
-    /// 階段 1 的簡體字偵測：只列出常見且「繁體中文不使用」的簡化字。
-    /// 這是暫時的保守清單，階段 2 會換成以 OpenCC 字典產生的完整集合。
+    /// Simplified-only characters (used in Traditional mode). The built-in list is a small conservative fallback;
+    /// the server replaces it on startup with the full set derived from OpenCC.
     /// </summary>
     public static class SimplifiedChars
     {
@@ -155,9 +176,43 @@ namespace AgentTranslation.Core
         private static HashSet<char> Set = new HashSet<char>(Chars);
 
         /// <summary>
-        /// 以完整集合取代內建清單。伺服器啟動時以 OpenCC STCharacters 產生：
-        /// 「轉換候選中不含自己」的字才算簡體專用字（例如 发→發髮 算；台→臺檯颱台 不算）。
+        /// Replaces the built-in list with a full set. The server builds it from OpenCC STCharacters: a character is
+        /// Simplified-only when none of its conversion candidates is itself (发 -> 發/髮 counts; 台 -> 臺/檯/颱/台 does not).
         /// </summary>
+        public static void UseSet(IEnumerable<char> chars)
+        {
+            Set = new HashSet<char>(chars);
+        }
+
+        public static int Count => Set.Count;
+
+        public static List<char> FindIn(string text)
+        {
+            var found = new List<char>();
+            foreach (var c in text)
+            {
+                if (Set.Contains(c))
+                {
+                    found.Add(c);
+                }
+            }
+            return found;
+        }
+    }
+
+    /// <summary>
+    /// Traditional-only characters (used in Simplified mode). The built-in list is a small conservative fallback;
+    /// the server replaces it on startup with the full set derived from OpenCC TSCharacters.
+    /// </summary>
+    public static class TraditionalChars
+    {
+        private const string Chars =
+            "這們說時為個國過對還發經動現麼關點與東車長門問間聽見風飛馬鳥魚龍會來給讓應該沒頭樣實開學進將軍戰擊傷隊槍彈藥裝備護態質級設計選擇確認顯儲運輸電資產業農場養續斷雜負擔損壞維"
+            + "廢庫棄張彎歸當錄徹憶憂懷總戀惡懸驚懼慘慣戲撲執擴掃揚擾撫拋搶報擬攏揀擁攔擰撥擋擠揮撿換擄擲攝擺搖攤敵斂數齋舊曠曬曉暈暫機殺權條楊極構樞棗棟欄樹檔橋槳夢檢樓欄櫻歡歐殲毆畢斃匯漢湯溝潑澤潔淺測濟渾濃濤澇潤漲淵漸漁滲灣濕潰滿濾濫濱灘滅燈靈災燦爐煉爛燭煩燒熱煥愛爺牽猶狽獅獨狹獄獵獻獲環瑣電暢療瘋癱癮監盤睜矯碼磚礎碩確礙禮禱禍離禿稈積稱種穩窮竊竅窯竄窩豎競筆籠篩籌簽簡糧緊糾紅纖約紀紉緯純紗綱納縱紛紙紋紡線練組細織終紹綁結繞繪絡絕統絹繡繼績緒繩綿綜綻綠綴纜緩編緣縛縫纏縮繳羅罰罷羈翹聯聰肅腸膚腎腫脹脅膽膠臟腦臉膩輿艦艙艱藝節蕪葦蒼蘇莖薦蕩榮葷萊蓮蘿螢營蕭薩藍薔虜慮蟲雖蝦蝕蟻螞蠻蠅釁補襯襖襪襲褲觀規覓視覽覺譽計訂認討訓議訊記講諱許論訪訣證評識詐訴診詞譯試詩誠話誕詢詳詫誡語誤誘請諸諾讀課誰調諒談誼謀諜謊諧謂謎謝謠謙謹譜貝貞負貢財責賢敗賬貨販貪貧購貫賤貼貴貸貿費賀賊資賦賭賞賠賴賺賽贊贈贏趙趕趨躍踐蹤躪軌軒轉輪軟轟軸輕載較輔輛輩輝輻輯輸轄辭邊遼達遷邁運遠違連遲選遜遞邏遺遙鄧郵鄰鄭醬釀釋針釣鈣鐘鋼鑰欽鉤鈕錢鑽鐵鈴鉛銅銘鋪鏈銷鎖鋤鍋鏽鋒銳錯錫錦鍵鋸鍛鎮鏡閃閉闖閒悶閘鬧聞閥閣閱陽陰陣階際陸陳險隨隱隸難霧頁頂項順須頑顧頓預領頗頻顆題顏額飄饑飯飲飾飽飼餓館馭驅駁駛駐駕罵驗騎騙騷鮮雞鳴鴨鴿鵝鷹麥齊齒齡龜";
+
+        private static HashSet<char> Set = new HashSet<char>(Chars);
+
+        /// <summary>Replaces the built-in list with a full set (characters whose OpenCC TSCharacters candidates never include themselves).</summary>
         public static void UseSet(IEnumerable<char> chars)
         {
             Set = new HashSet<char>(chars);

@@ -7,12 +7,12 @@ using System.Xml.Linq;
 namespace AgentTranslation.Core
 {
     /// <summary>
-    /// 從（已解析繼承的）Def 節點抽出可翻譯欄位，路徑規則對照 RimWorld 1.7.4998：
-    /// - DefInjectionUtility：路徑 = defName.欄位[.索引|.欄位]…；欄位帶 [NoTranslate]／[Unsaved] 時整個子樹不可翻譯；
-    ///   Def 參照不遞迴。
-    /// - DefInjectionUtility.ShouldCheckMissingInjection：[MustTranslate] 必翻；[MayTranslate] 不列入；
-    ///   其餘字串「含空白」才列入。本抽取器沿用同一規則，避免輸出遊戲不認為需要翻譯的欄位。
-    /// - DefInjectionPackage.SetDefFieldAtPath：清單可用數字索引定位，因此一律輸出索引路徑（不使用 handle）。
+    /// Extracts translatable fields from a Def node (inheritance already resolved). Path rules follow RimWorld 1.7.4998:
+    /// - DefInjectionUtility: path = defName.field[.index|.field]...; a field with [NoTranslate]/[Unsaved] makes its whole subtree untranslatable;
+    ///   Def references are not followed.
+    /// - DefInjectionUtility.ShouldCheckMissingInjection: [MustTranslate] is required; [MayTranslate] is not counted;
+    ///   other strings count only if they contain a space. Same rule here, so we never emit fields the game does not consider missing.
+    /// - DefInjectionPackage.SetDefFieldAtPath: list items can be addressed by numeric index, so index paths are always emitted (no handles).
     /// </summary>
     public sealed class DefExtractor
     {
@@ -37,17 +37,31 @@ namespace AgentTranslation.Core
             }
             if (!IsValidXmlNameStart(defName!))
             {
-                result.Notes.Add(new ScanNote("defname_not_xml_name", "defName " + defName + " 不能當 XML 元素名稱開頭，無法以 DefInjected 翻譯。", node.File));
+                result.Notes.Add(new ScanNote("defname_not_xml_name", "defName " + defName + " cannot start an XML element name, so it cannot be translated with DefInjected.", node.File));
                 return;
             }
             var defType = _schema.ResolveXmlTypeName(defTypeName);
             if (defType == null || !defType.IsDef)
             {
-                result.Notes.Add(new ScanNote("unknown_def_type", "無法辨識 Def 類型 " + defTypeName + "。", node.File));
+                result.Notes.Add(new ScanNote("unknown_def_type", "Unknown Def type " + defTypeName + ".", node.File));
                 return;
             }
 
-            // 若 Def 節點本身有 Class 屬性，欄位依該型別解析；DefInjected 資料夾仍用根元素名稱（DefDatabase 所屬類型）。
+            // DefInjected folder: the game adds a Def to the database of every class in its chain, and the standard folder is
+            // the topmost non-abstract class below Def (GenDefDatabase.AllDefTypesWithDatabases), e.g. HAR's
+            // AlienRace.AlienBackstoryDef -> BackstoryDef. Translations under any class name of the chain take effect.
+            var chain = _schema.DefChain(defType);
+            var databaseType = chain.LastOrDefault(t => !t.IsAbstract) ?? defType;
+            var folderName = _schema.XmlNameOf(databaseType);
+            var aliases = chain
+                .SelectMany(t => new[] { _schema.XmlNameOf(t), t.FullName, t.FullName.Substring(t.FullName.LastIndexOf('.') + 1) })
+                .Append(defTypeName)
+                .Where(n => !string.Equals(n, folderName, StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            defTypeName = folderName;
+
+            // If the Def node has a Class attribute, fields are resolved on that type; the folder stays the database type.
             var concreteType = defType;
             var cls = resolved.Attribute("Class")?.Value;
             if (!string.IsNullOrEmpty(cls))
@@ -55,7 +69,7 @@ namespace AgentTranslation.Core
                 var t = _schema.ResolveXmlTypeName(cls!);
                 if (t == null)
                 {
-                    result.Notes.Add(new ScanNote("unknown_class", "無法辨識 Class=" + cls + "，略過 " + defName + "。", node.File));
+                    result.Notes.Add(new ScanNote("unknown_class", "Unknown Class=" + cls + ", skipped " + defName + ".", node.File));
                     return;
                 }
                 concreteType = t;
@@ -69,6 +83,7 @@ namespace AgentTranslation.Core
             {
                 result.Entries[i].DefLabel = label;
                 result.Entries[i].DefDescription = description;
+                result.Entries[i].DefTypeAliases = aliases;
             }
         }
 
@@ -150,7 +165,7 @@ namespace AgentTranslation.Core
                 var t = _schema.ResolveXmlTypeName(cls!);
                 if (t == null)
                 {
-                    result.Notes.Add(new ScanNote("unknown_class", "無法辨識 Class=" + cls + "，略過其內容。", file));
+                    result.Notes.Add(new ScanNote("unknown_class", "Unknown Class=" + cls + ", its content was skipped.", file));
                 }
                 return t;
             }
@@ -185,8 +200,8 @@ namespace AgentTranslation.Core
     }
 
     /// <summary>
-    /// Keyed 抽取。對照 RimWorld 1.7.4998 DirectXmlLoaderSimple：根元素下每個子元素為一筆，
-    /// 鍵 = 元素名稱、值 = 元素文字；值為 "TODO" 視為占位。同檔重複鍵遊戲會報錯並保留第一筆。
+    /// Keyed extraction, following RimWorld 1.7.4998 DirectXmlLoaderSimple: each child of the root element is one entry,
+    /// key = element name, value = element text; "TODO" is a placeholder. The game reports duplicate keys within one file and keeps the first.
     /// </summary>
     public static class KeyedExtractor
     {
@@ -203,12 +218,12 @@ namespace AgentTranslation.Core
                 var value = element.Value;
                 if (!inFile.Add(key))
                 {
-                    result.Notes.Add(new ScanNote("duplicate_key", "同檔重複鍵 " + key + "。", relativeFile));
+                    result.Notes.Add(new ScanNote("duplicate_key", "Duplicate key " + key + " in the same file.", relativeFile));
                     continue;
                 }
                 if (!seenKeys.Add(key))
                 {
-                    // 遊戲中後讀到的檔案覆蓋前者；此處保留第一個（同模組內不同檔重複，翻譯包只需一筆）。
+                    // In game a later file overrides an earlier one; here the first is kept (duplicates across files of one mod need only one pack entry).
                     continue;
                 }
                 if (value.Length == 0 || value == "TODO")

@@ -1,16 +1,17 @@
+using System.Collections.Generic;
 namespace AgentTranslation.Core
 {
     public enum FieldKind
     {
-        /// <summary>string 欄位。</summary>
+        /// <summary>A string field.</summary>
         String,
-        /// <summary>List&lt;string&gt; 等字串集合。</summary>
+        /// <summary>A string collection such as List&lt;string&gt;.</summary>
         StringList,
-        /// <summary>自訂型別的清單（li 子節點各為一個物件）。</summary>
+        /// <summary>A list of custom objects (each li child is one object).</summary>
         ObjectList,
-        /// <summary>自訂型別的單一物件。</summary>
+        /// <summary>A single custom object.</summary>
         Object,
-        /// <summary>Def 參照或其他不會遞迴的型別（數值、列舉、Type、字典…）。</summary>
+        /// <summary>Def references or other non-recursive types (numbers, enums, Type, dictionaries...).</summary>
         Other,
     }
 
@@ -18,13 +19,13 @@ namespace AgentTranslation.Core
     {
         public string Name { get; set; } = string.Empty;
         public FieldKind Kind { get; set; }
-        /// <summary>Object：欄位型別；ObjectList：元素型別。完整名稱（Namespace.Type）。</summary>
+        /// <summary>Object: the field type; ObjectList: the element type. Full name (Namespace.Type).</summary>
         public string? ValueTypeFullName { get; set; }
         public bool NoTranslate { get; set; }
         public bool Unsaved { get; set; }
         public bool MustTranslate { get; set; }
         public bool MayTranslate { get; set; }
-        /// <summary>任務系統的 SlateRef 欄位，階段 1 不處理。</summary>
+        /// <summary>A quest SlateRef field; not handled yet.</summary>
         public bool SlateRef { get; set; }
         public bool TranslationCanChangeCount { get; set; }
     }
@@ -33,20 +34,27 @@ namespace AgentTranslation.Core
     {
         public string FullName { get; set; } = string.Empty;
         public bool IsDef { get; set; }
+        public bool IsAbstract { get; set; }
     }
 
     /// <summary>
-    /// 遊戲與模組組件的型別資訊（欄位、屬性）。伺服器端以 System.Reflection.Metadata 讀取組件中繼資料實作，
-    /// 不載入、不執行任何組件程式碼。
+    /// Type information (fields, attributes) from game and mod assemblies. The server implements it by reading assembly
+    /// metadata with System.Reflection.Metadata, without loading or executing any assembly code.
     /// </summary>
     public interface ITypeSchema
     {
-        /// <summary>依 XML 中的名稱（Defs 根元素名稱或 Class 屬性）解析型別，規則同 GenTypes.GetTypeInAnyAssembly。</summary>
+        /// <summary>Resolves a type from its XML name (Defs root element name or Class attribute), same rules as GenTypes.GetTypeInAnyAssembly.</summary>
         TypeShape? ResolveXmlTypeName(string name);
 
         TypeShape? GetByFullName(string fullName);
 
-        /// <summary>找欄位：不分大小寫、含基底型別、支援 LoadAlias。</summary>
+        /// <summary>Finds a field: case-insensitive, includes base types, supports LoadAlias.</summary>
         FieldShape? FindField(TypeShape type, string xmlName);
+
+        /// <summary>The type and its base types up to, but not including, Verse.Def (most derived first).</summary>
+        IReadOnlyList<TypeShape> DefChain(TypeShape type);
+
+        /// <summary>The shortest name that resolves back to this type (short name when it is in a fallback namespace, otherwise the full name).</summary>
+        string XmlNameOf(TypeShape type);
     }
 }

@@ -8,8 +8,9 @@ using AgentTranslation.Core;
 namespace AgentTranslation.Server;
 
 /// <summary>
-/// 簡轉繁抽查報告：從啟用中、沒有繁中但有簡中的模組抽樣，列出「英文 → 簡中 → 轉換結果 → 分級與原因」。
-/// 只讀取檔案，不寫入任何譯文。
+/// Spot-check report of Simplified -> Traditional conversion (for the user, so the report text is Traditional Chinese):
+/// samples active mods that have Simplified but no Traditional, listing English, Simplified, result, tier and reasons.
+/// Reads files only; writes no translation.
 /// </summary>
 public static class SpotCheckReport
 {
@@ -86,11 +87,11 @@ public static class SpotCheckReport
             sb.Append("- 可信度：").Append(s.Trust).Append("　新鮮度：").Append(FreshName(s.Freshness)).Append("\n");
             if (s.Reasons.Count > 0)
             {
-                sb.Append("- 原因：").Append(Esc(string.Join("；", s.Reasons))).Append("\n");
+                sb.Append("- 原因：").Append(Esc(string.Join("；", s.Reasons.Select(ReasonLabels.Zh)))).Append("\n");
             }
             if (s.TrustSignals.Count > 0)
             {
-                sb.Append("- 訊號：").Append(Esc(string.Join("；", s.TrustSignals))).Append("\n");
+                sb.Append("- 訊號：").Append(Esc(string.Join("；", s.TrustSignals.Select(ReasonLabels.Zh)))).Append("\n");
             }
             sb.Append('\n');
         }
@@ -103,7 +104,7 @@ public static class SpotCheckReport
         return sb.ToString();
     }
 
-    /// <summary>依分級配額、跨模組輪流挑選，並讓「校對」的原因多樣化。</summary>
+    /// <summary>Picks by tier quota, round-robin across mods, with diverse reasons in the review tier.</summary>
     private static List<SimplifiedSuggestion> Pick(List<SimplifiedSuggestion> all, int count)
     {
         var quotas = new Dictionary<SuggestionTier, int>
@@ -118,10 +119,10 @@ public static class SpotCheckReport
             var pool = all.Where(s => s.Tier == tier && s.Entry.Source.Length is >= 4 and <= 200).ToList();
             if (tier == SuggestionTier.Review)
             {
-                // 先依原因類別各取一筆。
-                foreach (var key in new[] { "一對多", "官方術語", "官方繁中對同一", "殘留英文", "機器翻譯", "舊版本", "驗證失敗" })
+                // One sample per reason kind first.
+                foreach (var key in new[] { "ambiguous_chars", "official_term_conflict", "official_wording_differs", "residual_english", "machine_source", "old_version_folder", "validation_failed", "key_as_english" })
                 {
-                    var hit = pool.FirstOrDefault(s => !picked.Contains(s) && s.Reasons.Any(r => r.Contains(key)));
+                    var hit = pool.FirstOrDefault(s => !picked.Contains(s) && s.Reasons.Any(r => r.Code == key));
                     if (hit != null && picked.Count(p => p.Tier == tier) < quota)
                     {
                         picked.Add(hit);
@@ -140,7 +141,7 @@ public static class SpotCheckReport
                 }
             }
         }
-        // 某一級不足時以其他級補滿。
+        // Fill up from other tiers when one tier is short.
         foreach (var s in all)
         {
             if (picked.Count >= count)

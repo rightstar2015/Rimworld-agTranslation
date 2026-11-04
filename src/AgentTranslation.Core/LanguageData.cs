@@ -9,17 +9,17 @@ using System.Xml.Linq;
 namespace AgentTranslation.Core
 {
     /// <summary>
-    /// 某語言已存在的翻譯鍵（Keyed 鍵名、DefInjected 的 DefType:路徑）。
-    /// 用來判定「已有翻譯，不要輸出」。DefInjected 跨模組重複鍵在 1.7 會產生
-    /// "Duplicate def-injected translation key" 錯誤，所以已存在的鍵一律不輸出。
+    /// Translation keys that already exist for a language (Keyed keys, DefInjected DefType:path).
+    /// Used to decide "already translated, do not emit". Existing keys are never emitted, so the pack never depends on
+    /// override order (see docs/LANGUAGE_MODE_PLAN.md section 1 for the verified duplicate-key behaviour).
     /// </summary>
     public sealed class ExistingTranslationIndex
     {
         public HashSet<string> Keyed { get; } = new HashSet<string>(StringComparer.Ordinal);
-        /// <summary>"DefType:defName.field…"，DefType 為資料夾名稱（含去掉結尾 s 的版本）。</summary>
+        /// <summary>"DefType:defName.field...", DefType being the folder name (also the version without a trailing s).</summary>
         public HashSet<string> DefInjected { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        /// <summary>"DefType:defName"，用於偵測「該 Def 有任何翻譯」（handle 路徑無法精確比對時的保守判斷）。</summary>
-        public HashSet<string> DefsTouched { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>"DefType:defName" -> existing paths split into segments, used to detect the same field written in another path form.</summary>
+        public Dictionary<string, List<string[]>> DefsTouched { get; } = new Dictionary<string, List<string[]>>(StringComparer.OrdinalIgnoreCase);
         public List<string> Sources { get; } = new List<string>();
 
         public bool Contains(SourceEntry entry)
@@ -28,21 +28,67 @@ namespace AgentTranslation.Core
             {
                 return Keyed.Contains(entry.InjectionPath);
             }
-            return DefInjected.Contains(entry.DefType + ":" + entry.InjectionPath);
+            return entry.CanonicalPathCandidates.Any(DefInjected.Contains);
         }
 
-        /// <summary>同一個 Def 有其他翻譯（可能用 handle 路徑），無法確定是否重複。</summary>
+        /// <summary>
+        /// Whether an existing translation may target the same field under a different path form, so a duplicate cannot be ruled out.
+        /// Our paths always use numeric list indices. The same list item can also be written with a handle (stages.Name.label
+        /// instead of stages.0.label), and a whole list can be injected at once (rulesStrings with li children instead of
+        /// rulesStrings.0). So an entry is ambiguous only when, at one of its numeric segments, an existing path for the same
+        /// Def has the same prefix followed by a non-numeric segment (a handle) or ends right there (a full-list injection).
+        /// Fields without list indices have only one path form and are never ambiguous.
+        /// </summary>
         public bool TouchesDef(SourceEntry entry)
         {
             if (entry.Kind != EntryKind.Def)
             {
                 return false;
             }
-            var defName = entry.InjectionPath.Split('.')[0];
-            return DefsTouched.Contains(entry.DefType + ":" + defName);
+            var segments = entry.InjectionPath.Split('.');
+            var existing = new[] { entry.DefType! }.Concat(entry.DefTypeAliases)
+                .SelectMany(n => DefsTouched.TryGetValue(n + ":" + segments[0], out var l) ? l : Enumerable.Empty<string[]>())
+                .ToList();
+            if (existing.Count == 0)
+            {
+                return false;
+            }
+            for (int i = 1; i < segments.Length; i++)
+            {
+                if (!IsIndex(segments[i]))
+                {
+                    continue;
+                }
+                foreach (var other in existing)
+                {
+                    if (other.Length < i || !SamePrefix(segments, other, i))
+                    {
+                        continue;
+                    }
+                    if (other.Length == i || !IsIndex(other[i]))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
-        /// <summary>讀取一個語言資料夾（例如 …/Languages/ChineseTraditional）。</summary>
+        private static bool IsIndex(string segment) => segment.Length > 0 && segment.All(char.IsDigit);
+
+        private static bool SamePrefix(string[] a, string[] b, int length)
+        {
+            for (int k = 0; k < length; k++)
+            {
+                if (!string.Equals(a[k], b[k], StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>Reads one language folder (e.g. .../Languages/ChineseTraditional).</summary>
         public void AddLanguageFolder(string languageDir)
         {
             if (!Directory.Exists(languageDir))
@@ -106,7 +152,14 @@ namespace AgentTranslation.Core
                             foreach (var n in names)
                             {
                                 DefInjected.Add(n + ":" + path);
-                                DefsTouched.Add(n + ":" + path.Split('.')[0]);
+                                var parts = path.Split('.');
+                                var defKey = n + ":" + parts[0];
+                                if (!DefsTouched.TryGetValue(defKey, out var list))
+                                {
+                                    list = new List<string[]>();
+                                    DefsTouched[defKey] = list;
+                                }
+                                list.Add(parts);
                             }
                         }
                     }
@@ -129,7 +182,7 @@ namespace AgentTranslation.Core
         }
     }
 
-    /// <summary>寫出 RimWorld LanguageData XML（Keyed 或 DefInjected 格式相同：根元素 LanguageData，子元素名 = 鍵／路徑）。</summary>
+    /// <summary>Writes RimWorld LanguageData XML (Keyed and DefInjected share the format: root LanguageData, child name = key/path).</summary>
     public static class LanguageDataWriter
     {
         public sealed class Item
@@ -178,7 +231,7 @@ namespace AgentTranslation.Core
             return sb.ToString() + "\n";
         }
 
-        /// <summary>XML 註解不可含 "--"，也不可以 "-" 結尾。</summary>
+        /// <summary>XML comments must not contain "--" or end with "-".</summary>
         public static string SafeComment(string text)
         {
             var s = text.Replace("\r", " ").Replace("\n", "\\n");

@@ -9,8 +9,8 @@ namespace AgentTranslation.Core
     }
 
     /// <summary>
-    /// 所有寫入都必須經過這裡。拒絕絕對路徑、磁碟代號、UNC、..、保留裝置名稱，
-    /// 以及路徑上任何符號連結／junction（reparse point）。
+    /// Every write must go through here. Rejects absolute paths, drive letters, UNC, .., reserved device names,
+    /// and any symbolic link or junction (reparse point) along the path.
     /// </summary>
     public static class PathSandbox
     {
@@ -21,20 +21,20 @@ namespace AgentTranslation.Core
             "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
         };
 
-        /// <summary>把相對路徑解析到 root 底下，並驗證沒有逃逸。回傳完整路徑。</summary>
+        /// <summary>Resolves a relative path under root and verifies it does not escape. Returns the full path.</summary>
         public static string Resolve(string root, string relative)
         {
             if (string.IsNullOrWhiteSpace(root))
             {
-                throw new SandboxViolationException("沙箱根目錄未設定。");
+                throw new SandboxViolationException("Sandbox root is not set.");
             }
             if (string.IsNullOrEmpty(relative))
             {
-                throw new SandboxViolationException("相對路徑為空。");
+                throw new SandboxViolationException("Relative path is empty.");
             }
             if (Path.IsPathRooted(relative) || relative.IndexOf(':') >= 0 || relative.StartsWith("\\\\", StringComparison.Ordinal) || relative.StartsWith("//", StringComparison.Ordinal))
             {
-                throw new SandboxViolationException("不允許絕對路徑：" + relative);
+                throw new SandboxViolationException("Absolute paths are not allowed: " + relative);
             }
 
             var invalid = Path.GetInvalidFileNameChars();
@@ -42,15 +42,15 @@ namespace AgentTranslation.Core
             {
                 if (part.Length == 0 || part == "." || part == "..")
                 {
-                    throw new SandboxViolationException("不允許的路徑片段：" + relative);
+                    throw new SandboxViolationException("Path segment not allowed: " + relative);
                 }
                 if (part.IndexOfAny(invalid) >= 0)
                 {
-                    throw new SandboxViolationException("路徑含不合法字元：" + relative);
+                    throw new SandboxViolationException("Path contains invalid characters: " + relative);
                 }
                 if (part.EndsWith(" ", StringComparison.Ordinal) || part.EndsWith(".", StringComparison.Ordinal))
                 {
-                    throw new SandboxViolationException("路徑片段不可以空白或句點結尾：" + relative);
+                    throw new SandboxViolationException("Path segments must not end with a space or dot: " + relative);
                 }
                 var stem = part;
                 var dot = stem.IndexOf('.');
@@ -62,7 +62,7 @@ namespace AgentTranslation.Core
                 {
                     if (string.Equals(stem, reserved, StringComparison.OrdinalIgnoreCase))
                     {
-                        throw new SandboxViolationException("不允許的保留名稱：" + relative);
+                        throw new SandboxViolationException("Reserved device name not allowed: " + relative);
                     }
                 }
             }
@@ -71,13 +71,13 @@ namespace AgentTranslation.Core
             var full = Path.GetFullPath(Path.Combine(rootFull, relative));
             if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
             {
-                throw new SandboxViolationException("路徑逃逸出沙箱：" + relative);
+                throw new SandboxViolationException("Path escapes the sandbox: " + relative);
             }
             EnsureNoReparsePoints(rootFull, full);
             return full;
         }
 
-        /// <summary>確認 root 本身存在時不是 reparse point。</summary>
+        /// <summary>Verifies that root itself, if it exists, is not a reparse point.</summary>
         public static string NormalizeRoot(string root)
         {
             var rootFull = Path.GetFullPath(root);
@@ -85,12 +85,12 @@ namespace AgentTranslation.Core
             var trimmed = rootFull.TrimEnd(Path.DirectorySeparatorChar);
             if (Directory.Exists(trimmed) && IsReparsePoint(trimmed))
             {
-                throw new SandboxViolationException("沙箱根目錄是符號連結或 junction：" + trimmed);
+                throw new SandboxViolationException("Sandbox root is a symbolic link or junction: " + trimmed);
             }
             return rootFull;
         }
 
-        /// <summary>從 root 往下逐層檢查已存在的目錄與檔案，任何一層是 reparse point 就拒絕。</summary>
+        /// <summary>Walks existing directories and files from root downwards and rejects any reparse point.</summary>
         public static void EnsureNoReparsePoints(string rootFull, string full)
         {
             var rest = full.Substring(rootFull.Length);
@@ -104,7 +104,7 @@ namespace AgentTranslation.Core
                 current = Path.Combine(current, part);
                 if ((Directory.Exists(current) || File.Exists(current)) && IsReparsePoint(current))
                 {
-                    throw new SandboxViolationException("路徑經過符號連結或 junction：" + current);
+                    throw new SandboxViolationException("Path goes through a symbolic link or junction: " + current);
                 }
             }
         }

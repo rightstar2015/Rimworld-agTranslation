@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,14 +7,14 @@ using AgentTranslation.Core;
 
 namespace AgentTranslation.Server;
 
-/// <summary>簡中翻譯的來源類型，依可信度由高到低。</summary>
+/// <summary>Kind of Simplified translation source, from most to least trusted.</summary>
 public enum SimplifiedOrigin
 {
-    /// <summary>被翻譯模組自己附帶的簡中（作者或貢獻者維護）。</summary>
+    /// <summary>Shipped by the translated mod itself (author or contributors).</summary>
     ModSelf,
-    /// <summary>另一個翻譯補丁模組。</summary>
+    /// <summary>Another translation patch mod.</summary>
     Patch,
-    /// <summary>名稱或作者顯示為機器翻譯／AI 產生的翻譯包。</summary>
+    /// <summary>A pack whose name or author says it is machine/AI translated.</summary>
     Machine,
 }
 
@@ -23,52 +23,94 @@ public sealed class SimplifiedSource
     public required LanguageRecord Record { get; init; }
     public required InstalledMod Provider { get; init; }
     public required SimplifiedOrigin Origin { get; init; }
-    /// <summary>語言資料夾所在的子資料夾（"" 為模組根目錄，"1.4"、"Common"…）。</summary>
+    /// <summary>Sub folder holding the Languages folder ("" for the mod root, "1.4", "Common"...).</summary>
     public required string Folder { get; init; }
-    /// <summary>該資料夾目前是否會被遊戲載入。</summary>
+    /// <summary>Whether the game currently loads that folder.</summary>
     public required bool CurrentFolder { get; init; }
-    /// <summary>同一資料夾下的英文（若存在），用於過期偵測。</summary>
+    /// <summary>English in the same folder, if any; used to detect staleness.</summary>
     public string? SameFolderEnglish { get; init; }
 }
 
 public enum Freshness
 {
-    /// <summary>EN 註解或同資料夾英文與目前英文一致。</summary>
+    /// <summary>EN comment or same-folder English equals the current English.</summary>
     Confirmed,
-    /// <summary>沒有可比對的證據，但 token 一致。</summary>
+    /// <summary>Nothing to compare against, but tokens match.</summary>
     Unverified,
-    /// <summary>EN 註解或同資料夾英文與目前英文不同。</summary>
+    /// <summary>EN comment or same-folder English differs from the current English.</summary>
     Stale,
-    /// <summary>佔位符／標記與目前英文不一致。</summary>
+    /// <summary>Placeholders or markup differ from the current English.</summary>
     TokenMismatch,
 }
 
 public enum SuggestionTier
 {
-    /// <summary>符合直接採用條件（目前仍只作為建議，需使用者開啟自動採用）。</summary>
+    /// <summary>Meets the conditions for direct adoption (still only a suggestion until the user enables auto-adopt).</summary>
     Direct,
-    /// <summary>交給 Agent 校對。</summary>
+    /// <summary>Needs agent review.</summary>
     Review,
-    /// <summary>簡中已過期，需重新翻譯（簡中只作參考）。</summary>
+    /// <summary>The Simplified text is stale; retranslate (Simplified is reference only).</summary>
     Retranslate,
+}
+
+/// <summary>A reason or signal with a stable code. Agents get the English text; user reports map the code to Chinese.</summary>
+public sealed record Reason(string Code, string Data = "")
+{
+    public string English => Code switch
+    {
+        "token_mismatch" => "Placeholders/markup in the Simplified text differ from the current English",
+        "en_comment_mismatch" => "The EN comment in the Simplified file differs from the current English",
+        "same_folder_english_mismatch" => "English next to the Simplified file differs from the current English",
+        "identical_to_english" => "The Simplified text equals the English (untranslated)",
+        "residual_english" => "English words left in the Simplified text: " + Data,
+        "machine_source" => "The source looks machine translated",
+        "key_as_english" => "The English is just the key name (the author probably wrote no English)",
+        "chinese_in_english" => "The English source contains Chinese (the mod may keep Chinese in its English folder)",
+        "ambiguous_chars" => "One-to-many characters: " + Data,
+        "official_term_conflict" => "Official term has several Traditional spellings: " + Data,
+        "official_wording_differs" => "Official Traditional uses different wording for this text: " + Data,
+        "agent_glossary_term" => "Uses glossary terms added by an agent (needs confirmation): " + Data,
+        "validation_failed" => "The result fails validation: " + Data,
+        "old_version_folder" => "Comes from a folder the game does not load: " + Data,
+        "en_comment_match" => "EN comment matches",
+        "same_folder_english_match" => "Same-folder English matches",
+        "unverified" => "No English to compare against (unverified)",
+        "origin_mod_self" => "Shipped by the mod itself",
+        "origin_patch" => "Translation patch: " + Data,
+        "origin_machine" => "Suspected machine translation: " + Data,
+        "coverage_high" => "Provider covers most of this mod (" + Data + ")",
+        "coverage_low" => "Provider covers little of this mod (" + Data + ")",
+        "official_term_applied" => "Official terms applied: " + Data,
+        _ => Code + (Data.Length > 0 ? ": " + Data : ""),
+    };
 }
 
 public sealed class SimplifiedSuggestion
 {
     public required SourceEntry Entry { get; init; }
     public required SimplifiedSource Source { get; init; }
+    /// <summary>In Traditional mode the converted text; in Simplified mode the Simplified text unchanged.</summary>
     public required ConversionResult Conversion { get; init; }
     public required Freshness Freshness { get; init; }
     public required SuggestionTier Tier { get; init; }
     public required int Trust { get; init; }
-    public required List<string> Reasons { get; init; }
-    public List<string> TrustSignals { get; init; } = new();
+    public required List<Reason> Reasons { get; init; }
+    public List<Reason> TrustSignals { get; init; } = new();
     public ValidationOutcome? Validation { get; init; }
 }
 
+/// <summary>An existing, active Simplified translation that no longer matches the current English.</summary>
+public sealed class StaleTranslation
+{
+    public required SourceEntry Entry { get; init; }
+    public required SimplifiedSource Source { get; init; }
+    public required Freshness Freshness { get; init; }
+}
+
 /// <summary>
-/// 全域簡中翻譯記憶：收集所有已安裝模組（含未啟用的翻譯補丁、舊版本資料夾）的 ChineseSimplified 翻譯，
-/// 依 key／DefInjected 路徑對應到目前英文條目，轉成繁中並分級。
+/// Global Simplified translation memory: collects the ChineseSimplified translations of every installed mod (including
+/// inactive translation patches and old version folders), maps them by key / DefInjected path to current English entries,
+/// and classifies them. Traditional mode converts them with OpenCC; Simplified mode uses them as they are.
 /// </summary>
 public sealed class SimplifiedMemory
 {
@@ -79,6 +121,7 @@ public sealed class SimplifiedMemory
     private readonly GameEnvironment _env;
     private readonly ChineseResources _zh;
     private readonly Dictionary<string, List<SimplifiedSource>> _byPath = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<(string Text, string Provider)>> _byEnglish = new(StringComparer.Ordinal);
     private bool _built;
 
     public SimplifiedMemory(AppConfig config, GameEnvironment env, ChineseResources zh)
@@ -112,8 +155,7 @@ public sealed class SimplifiedMemory
             {
                 foreach (var dir in Directory.GetDirectories(languagesDir))
                 {
-                    var name = Path.GetFileName(dir);
-                    if (!(name == "ChineseSimplified" || name.StartsWith("ChineseSimplified (", StringComparison.Ordinal)))
+                    if (!TargetLanguages.FolderMatches(Path.GetFileName(dir), TargetLanguages.Simplified))
                     {
                         continue;
                     }
@@ -136,6 +178,7 @@ public sealed class SimplifiedMemory
                         {
                             Add(rec.CanonicalPathSingular, src);
                         }
+                        AddEnglish(rec.EnglishComment ?? en, rec.Text, origin, mod);
                         RecordCount++;
                         provided = true;
                     }
@@ -158,6 +201,57 @@ public sealed class SimplifiedMemory
         list.Add(src);
     }
 
+    /// <summary>English -> Simplified index for style consistency. Only pairs whose English is known and not from machine sources.</summary>
+    private void AddEnglish(string? english, string text, SimplifiedOrigin origin, InstalledMod provider)
+    {
+        if (english == null || origin == SimplifiedOrigin.Machine || text.Length == 0)
+        {
+            return;
+        }
+        var en = LanguageFileReader.NormalizeEnglish(english);
+        if (en.Length == 0 || LanguageFileReader.NormalizeEnglish(text) == en)
+        {
+            return;
+        }
+        if (!_byEnglish.TryGetValue(en, out var list))
+        {
+            list = new List<(string, string)>();
+            _byEnglish[en] = list;
+        }
+        if (list.Count < 3 && !list.Any(x => x.Text == text))
+        {
+            list.Add((text, provider.About.Name));
+        }
+    }
+
+    /// <summary>Existing Simplified translations of the same English in any installed mod (at most 3).</summary>
+    public IReadOnlyList<(string Text, string Provider)> ByEnglish(string english)
+    {
+        EnsureBuilt();
+        return _byEnglish.TryGetValue(LanguageFileReader.NormalizeEnglish(english), out var list) ? list : Array.Empty<(string, string)>();
+    }
+
+    /// <summary>Iterates the English -> Simplified index (for query_memory).</summary>
+    public IEnumerable<KeyValuePair<string, List<(string Text, string Provider)>>> EnglishIndex()
+    {
+        EnsureBuilt();
+        return _byEnglish;
+    }
+
+    /// <summary>Simplified sources for an entry under any accepted Def type name.</summary>
+    private List<SimplifiedSource> SourcesFor(SourceEntry e)
+    {
+        var result = new List<SimplifiedSource>();
+        foreach (var key in e.CanonicalPathCandidates.Distinct(StringComparer.Ordinal))
+        {
+            if (_byPath.TryGetValue(key, out var list))
+            {
+                result.AddRange(list);
+            }
+        }
+        return result;
+    }
+
     private static Dictionary<string, string> ReadEnglish(string dir)
     {
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -168,7 +262,7 @@ public sealed class SimplifiedMemory
         return map;
     }
 
-    /// <summary>模組內所有 Languages 資料夾（深度 ≤ 3），回傳 (所在子資料夾, Languages 路徑)。</summary>
+    /// <summary>All Languages folders in a mod (depth &lt;= 3), as (sub folder, Languages path).</summary>
     private static List<(string, string)> FindLanguageDirs(string root)
     {
         var result = new List<(string, string)>();
@@ -212,10 +306,10 @@ public sealed class SimplifiedMemory
 
     private readonly Dictionary<string, (ModScan Scan, List<SimplifiedSuggestion> List)> _suggestCache = new(StringComparer.Ordinal);
 
-    /// <summary>術語表變更後呼叫，讓下次 Suggest 重新轉換。</summary>
+    /// <summary>Call after glossary changes so the next Suggest converts again.</summary>
     public void ClearSuggestions() => _suggestCache.Clear();
 
-    /// <summary>為一個模組的待翻譯條目產生簡中轉繁建議（同一份掃描結果只計算一次）。</summary>
+    /// <summary>Suggestions for the untranslated entries of one mod (computed once per scan result).</summary>
     public List<SimplifiedSuggestion> Suggest(ModScan scan)
     {
         if (_suggestCache.TryGetValue(scan.Mod.PackageId, out var hit) && ReferenceEquals(hit.Scan, scan))
@@ -227,6 +321,9 @@ public sealed class SimplifiedMemory
         return list;
     }
 
+    private static SimplifiedSource WithOwnOrigin(SimplifiedSource s, ModScan scan) =>
+        s.Provider.PackageId == scan.Mod.PackageId ? s.WithOrigin(SimplifiedOrigin.ModSelf) : s;
+
     private List<SimplifiedSuggestion> SuggestUncached(ModScan scan)
     {
         EnsureBuilt();
@@ -235,12 +332,13 @@ public sealed class SimplifiedMemory
         var candidates = new List<(SourceEntry Entry, SimplifiedSource Src)>();
         foreach (var e in scan.Translatable)
         {
-            if (!_byPath.TryGetValue(e.CanonicalPath, out var list))
+            var list = SourcesFor(e);
+            if (list.Count == 0)
             {
                 continue;
             }
             var best = list
-                .Select(s => s.Provider.PackageId == scan.Mod.PackageId ? s.WithOrigin(SimplifiedOrigin.ModSelf) : s)
+                .Select(s => WithOwnOrigin(s, scan))
                 .OrderBy(s => s.Origin)
                 .ThenByDescending(s => s.CurrentFolder)
                 .ThenByDescending(s => s.Provider.Active)
@@ -256,64 +354,114 @@ public sealed class SimplifiedMemory
         return result;
     }
 
+    /// <summary>
+    /// Entries already translated by an active, loaded Simplified file that no longer matches the current English.
+    /// Only meaningful in Simplified mode, where those files count as existing translations.
+    /// </summary>
+    public List<StaleTranslation> StaleExisting(ModScan scan)
+    {
+        EnsureBuilt();
+        var result = new List<StaleTranslation>();
+        foreach (var e in scan.Entries.Where(e => scan.AlreadyTranslated.Contains(e.Id)))
+        {
+            var list = SourcesFor(e);
+            if (list.Count == 0)
+            {
+                continue;
+            }
+            // The text the game shows: the last loaded active provider in a loaded folder.
+            var shown = list.Where(s => s.Provider.Active && s.CurrentFolder).OrderByDescending(s => s.Provider.LoadOrder).FirstOrDefault();
+            if (shown == null)
+            {
+                continue;
+            }
+            var fresh = FreshnessOf(e, shown, out _);
+            if (fresh is Freshness.Stale or Freshness.TokenMismatch)
+            {
+                result.Add(new StaleTranslation { Entry = e, Source = WithOwnOrigin(shown, scan), Freshness = fresh });
+            }
+        }
+        return result;
+    }
+
+    private static Freshness FreshnessOf(SourceEntry e, SimplifiedSource src, out Reason reason)
+    {
+        var current = LanguageFileReader.NormalizeEnglish(e.Source);
+        if (Tokens.Diff(e.Source, src.Record.Text).Count > 0)
+        {
+            reason = new Reason("token_mismatch");
+            return Freshness.TokenMismatch;
+        }
+        if (src.Record.EnglishComment != null)
+        {
+            var ok = LanguageFileReader.NormalizeEnglish(src.Record.EnglishComment) == current;
+            reason = new Reason(ok ? "en_comment_match" : "en_comment_mismatch");
+            return ok ? Freshness.Confirmed : Freshness.Stale;
+        }
+        if (src.SameFolderEnglish != null)
+        {
+            var ok = LanguageFileReader.NormalizeEnglish(src.SameFolderEnglish) == current;
+            reason = new Reason(ok ? "same_folder_english_match" : "same_folder_english_mismatch");
+            return ok ? Freshness.Confirmed : Freshness.Stale;
+        }
+        reason = new Reason("unverified");
+        return Freshness.Unverified;
+    }
+
     private SimplifiedSuggestion Evaluate(SourceEntry e, SimplifiedSource src, double providerCoverage)
     {
-        var reasons = new List<string>();
-        var signals = new List<string>();
+        var reasons = new List<Reason>();
+        var signals = new List<Reason>();
         var sc = src.Record.Text;
-        var conversion = _zh.Converter.Convert(sc);
-
-        // ---- 過期偵測 ----
-        Freshness fresh;
-        var current = LanguageFileReader.NormalizeEnglish(e.Source);
-        if (Tokens.Diff(e.Source, sc).Count > 0)
+        var traditional = _config.IsTraditional;
+        // Simplified mode: same language, the text is used unchanged.
+        ConversionResult conversion;
+        if (traditional)
         {
-            fresh = Freshness.TokenMismatch;
-            reasons.Add("簡中的佔位符／標記與目前英文不一致");
-        }
-        else if (src.Record.EnglishComment != null)
-        {
-            fresh = LanguageFileReader.NormalizeEnglish(src.Record.EnglishComment) == current ? Freshness.Confirmed : Freshness.Stale;
-            if (fresh == Freshness.Stale)
-            {
-                reasons.Add("簡中檔的 EN 註解與目前英文不同");
-            }
-            signals.Add(fresh == Freshness.Confirmed ? "EN 註解吻合" : "EN 註解不符");
-        }
-        else if (src.SameFolderEnglish != null)
-        {
-            fresh = LanguageFileReader.NormalizeEnglish(src.SameFolderEnglish) == current ? Freshness.Confirmed : Freshness.Stale;
-            if (fresh == Freshness.Stale)
-            {
-                reasons.Add("簡中所在資料夾的英文與目前英文不同");
-            }
-            signals.Add(fresh == Freshness.Confirmed ? "同資料夾英文吻合" : "同資料夾英文不符");
+            conversion = _zh.Converter.Convert(sc);
         }
         else
         {
-            fresh = Freshness.Unverified;
-            signals.Add("無可比對的英文（未驗證）");
+            conversion = new ConversionResult { Text = sc };
+            conversion.Segments.Add(new ConversionSegment(sc, sc, SegmentSource.Unchanged, null));
         }
 
-        // ---- 可信度訊號 ----
+        // ---- Staleness ----
+        var current = LanguageFileReader.NormalizeEnglish(e.Source);
+        var fresh = FreshnessOf(e, src, out var freshReason);
+        if (fresh is Freshness.Stale or Freshness.TokenMismatch)
+        {
+            reasons.Add(freshReason);
+        }
+        else
+        {
+            signals.Add(freshReason);
+        }
+
+        // ---- Trust signals ----
         int trust = src.Origin switch { SimplifiedOrigin.ModSelf => 70, SimplifiedOrigin.Patch => 60, _ => 25 };
-        signals.Add(src.Origin switch { SimplifiedOrigin.ModSelf => "模組自帶", SimplifiedOrigin.Patch => "翻譯補丁：" + src.Provider.About.Name, _ => "疑似機翻來源：" + src.Provider.About.Name });
+        signals.Add(src.Origin switch
+        {
+            SimplifiedOrigin.ModSelf => new Reason("origin_mod_self"),
+            SimplifiedOrigin.Patch => new Reason("origin_patch", src.Provider.About.Name),
+            _ => new Reason("origin_machine", src.Provider.About.Name),
+        });
         if (fresh == Freshness.Confirmed) trust += 15;
         if (fresh == Freshness.Unverified) trust -= 5;
         if (!src.CurrentFolder)
         {
             trust -= 15;
-            signals.Add("來自未載入的資料夾 " + (src.Folder.Length == 0 ? "(根目錄)" : src.Folder));
+            signals.Add(new Reason("old_version_folder", src.Folder.Length == 0 ? "(root)" : src.Folder));
         }
         if (providerCoverage >= 0.8)
         {
             trust += 5;
-            signals.Add("來源覆蓋率高（" + providerCoverage.ToString("P0") + "）");
+            signals.Add(new Reason("coverage_high", providerCoverage.ToString("P0")));
         }
         else if (providerCoverage < 0.3)
         {
             trust -= 5;
-            signals.Add("來源覆蓋率低（" + providerCoverage.ToString("P0") + "）");
+            signals.Add(new Reason("coverage_low", providerCoverage.ToString("P0")));
         }
         var residual = ResidualEnglish.Matches(Tokens.StripTokens(sc)).Select(m => m.Value).Where(w => !_config.ProperNouns.Contains(w, StringComparer.OrdinalIgnoreCase)).ToList();
         var suspicious = false;
@@ -321,61 +469,65 @@ public sealed class SimplifiedMemory
         {
             suspicious = true;
             trust -= 40;
-            reasons.Add("簡中與英文相同（未翻譯）");
+            reasons.Add(new Reason("identical_to_english"));
         }
         else if (residual.Count > 0)
         {
             suspicious = true;
             trust -= 15;
-            reasons.Add("簡中殘留英文：" + string.Join("、", residual.Distinct().Take(3)));
+            reasons.Add(new Reason("residual_english", string.Join(", ", residual.Distinct().Take(3))));
         }
         if (src.Origin == SimplifiedOrigin.Machine)
         {
-            reasons.Add("來源疑似機器翻譯");
+            reasons.Add(new Reason("machine_source"));
         }
-        // 英文原文本身可疑：作者沒寫英文（值就是鍵名），或英文資料夾裡放的是中文。
+        // The English source itself is suspicious: no English written (value equals the key) or Chinese in the English folder.
         var englishSuspect = false;
         if (e.Kind == EntryKind.Keyed && string.Equals(e.Source.Trim(), e.InjectionPath, StringComparison.OrdinalIgnoreCase))
         {
             englishSuspect = true;
-            reasons.Add("英文就是鍵名本身（作者可能沒寫英文），無法對照原文");
+            reasons.Add(new Reason("key_as_english"));
         }
         else if (e.Source.Any(c => c >= 0x3400 && c <= 0x9FFF))
         {
             englishSuspect = true;
-            reasons.Add("英文原文含中文（模組可能把中文放在 English 資料夾）");
+            reasons.Add(new Reason("chinese_in_english"));
         }
 
-        // ---- 轉換品質 ----
+        // ---- Conversion quality (Traditional mode only) ----
         var ambiguous = conversion.AmbiguousSegments.ToList();
         if (ambiguous.Count > 0)
         {
-            reasons.Add("一對多字：" + string.Join("、", ambiguous.Select(a => a.Source + "→" + a.Result + "（另有 " + string.Join("/", a.Alternatives) + "）").Distinct().Take(4)));
+            reasons.Add(new Reason("ambiguous_chars", string.Join(", ", ambiguous.Select(a => a.Source + "->" + a.Result + " (also " + string.Join("/", a.Alternatives) + ")").Distinct().Take(4))));
         }
-        var conflicts = _zh.ConflictingTermsIn(sc);
+        var conflicts = traditional ? _zh.ConflictingTermsIn(sc) : new List<GlossaryTerm>();
         if (conflicts.Count > 0)
         {
-            reasons.Add("官方術語有多種寫法：" + string.Join("、", conflicts.Select(c => c.Simplified + "→" + string.Join("/", c.Traditional.Select(t => t.Text)))));
+            reasons.Add(new Reason("official_term_conflict", string.Join(", ", conflicts.Select(c => c.Simplified + "->" + string.Join("/", c.Traditional.Select(t => t.Text))))));
         }
-        var labelHint = _zh.LabelHints.TryGetValue(sc.Trim(), out var hint) ? hint : null;
+        var labelHint = traditional && _zh.LabelHints.TryGetValue(sc.Trim(), out var hint) ? hint : null;
         if (labelHint != null)
         {
-            reasons.Add("官方繁中對同一簡中詞譯為「" + string.Join("／", labelHint.Traditional.Select(t => t.Text)) + "」（用詞不同，非逐字轉換）");
+            reasons.Add(new Reason("official_wording_differs", string.Join("/", labelHint.Traditional.Select(t => t.Text))));
         }
-        var glossaryHits = conversion.GlossarySegments.Select(g => g.Source + "→" + g.Result).Distinct().ToList();
+        var glossaryHits = conversion.GlossarySegments.Select(g => g.Source + "->" + g.Result).Distinct().ToList();
         if (glossaryHits.Count > 0)
         {
-            signals.Add("套用官方術語：" + string.Join("、", glossaryHits.Take(4)));
+            signals.Add(new Reason("official_term_applied", string.Join(", ", glossaryHits.Take(4))));
         }
-        var agentTerms = conversion.GlossarySegments.Where(g => _zh.AgentTerms.Contains(g.Source)).Select(g => g.Source + "→" + g.Result).Distinct().ToList();
+        var agentTerms = conversion.GlossarySegments.Where(g => _zh.AgentTerms.Contains(g.Source)).Select(g => g.Source + "->" + g.Result).Distinct().ToList();
         if (agentTerms.Count > 0)
         {
-            reasons.Add("使用了 Agent 新增的術語（需人工或 Agent 確認）：" + string.Join("、", agentTerms.Take(3)));
+            reasons.Add(new Reason("agent_glossary_term", string.Join(", ", agentTerms.Take(3))));
         }
-        var validation = Validator.Validate(e.Source, conversion.Text, new ValidatorOptions { ProperNounWhitelist = new HashSet<string>(_config.ProperNouns, StringComparer.OrdinalIgnoreCase) });
+        var validation = Validator.Validate(e.Source, conversion.Text, new ValidatorOptions
+        {
+            ProperNounWhitelist = new HashSet<string>(_config.ProperNouns, StringComparer.OrdinalIgnoreCase),
+            Script = TargetLanguages.ScriptOf(_config.TargetLanguage),
+        });
         if (!validation.Accepted)
         {
-            reasons.Add("轉換結果驗證失敗：" + string.Join("、", validation.Rejects.Select(r => r.Code)));
+            reasons.Add(new Reason("validation_failed", string.Join(", ", validation.Rejects.Select(r => r.Code))));
         }
 
         trust = Math.Clamp(trust, 0, 100);
@@ -387,9 +539,9 @@ public sealed class SimplifiedMemory
         else if (ambiguous.Count > 0 || conflicts.Count > 0 || labelHint != null || suspicious || englishSuspect || agentTerms.Count > 0 || src.Origin == SimplifiedOrigin.Machine || !src.CurrentFolder || !validation.Accepted)
         {
             tier = SuggestionTier.Review;
-            if (!src.CurrentFolder && !reasons.Any(r => r.Contains("資料夾")))
+            if (!src.CurrentFolder)
             {
-                reasons.Add("來源為舊版本資料夾");
+                reasons.Add(new Reason("old_version_folder", src.Folder.Length == 0 ? "(root)" : src.Folder));
             }
         }
         else

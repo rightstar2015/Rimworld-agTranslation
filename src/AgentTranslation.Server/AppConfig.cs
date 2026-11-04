@@ -5,31 +5,77 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using AgentTranslation.Core;
 
 namespace AgentTranslation.Server;
 
+/// <summary>Supported target languages. Only these two folder names are ever accepted.</summary>
+public static class TargetLanguages
+{
+    public const string Simplified = "ChineseSimplified";
+    public const string Traditional = "ChineseTraditional";
+
+    public static bool IsValid(string? value) => value is Simplified or Traditional;
+
+    public static TargetScript ScriptOf(string language) => language == Traditional ? TargetScript.Traditional : TargetScript.Simplified;
+
+    /// <summary>Language name shown to agents.</summary>
+    public static string AgentName(string language) => language == Traditional
+        ? "Traditional Chinese (Taiwan usage, e.g. 軟體, 介面, 資料夾)"
+        : "Simplified Chinese (mainland usage)";
+
+    /// <summary>Native name used in the pack's About.xml.</summary>
+    public static string NativeName(string language) => language == Traditional ? "繁體中文" : "简体中文";
+
+    /// <summary>The other Chinese language (source of conversion memory in Traditional mode).</summary>
+    public static string Other(string language) => language == Traditional ? Simplified : Traditional;
+
+    /// <summary>True when a language folder name ("ChineseSimplified" or "ChineseSimplified (简体中文)") belongs to the language.</summary>
+    public static bool FolderMatches(string folderName, string language) =>
+        folderName == language || folderName.StartsWith(language + " (", StringComparison.Ordinal);
+}
+
 /// <summary>
-/// 設定檔：&lt;工作資料夾&gt;/config.json。只放路徑與名稱，不放任何密鑰。
-/// 工作資料夾預設 %LOCALAPPDATA%\RimWorldAgentTranslation，可用環境變數 RWAT_WORK_DIR 覆寫。
+/// Settings file: &lt;work folder&gt;/config.json. Paths and names only, never any secret.
+/// The work folder defaults to %LOCALAPPDATA%\RimWorldAgentTranslation and can be overridden with RWAT_WORK_DIR.
 /// </summary>
 public sealed class AppConfig
 {
+    private const string OldDefaultDisplayName = "Agent Translation Pack (繁體中文)";
+
     public string? GameDir { get; set; }
     public List<string> WorkshopDirs { get; set; } = new();
     public string? ConfigDir { get; set; }
-    /// <summary>翻譯包輸出的上層資料夾；null 表示遊戲的 Mods 資料夾。可用環境變數 RWAT_PACK_OUTPUT_DIR 覆寫。</summary>
+    /// <summary>Parent folder of the pack; null means the game's Mods folder. Overridden by RWAT_PACK_OUTPUT_DIR.</summary>
     public string? PackOutputDir { get; set; }
     public string PackFolderName { get; set; } = "!AgentTranslation_Pack";
     public string PackPackageId { get; set; } = "agenttranslation.pack";
-    public string PackDisplayName { get; set; } = "Agent Translation Pack (繁體中文)";
-    /// <summary>輸出語言資料夾名稱。遊戲以「完整名稱」或「括號前的舊名稱」比對，因此用舊名稱即可。</summary>
-    public string TargetLanguageFolder { get; set; } = "ChineseTraditional";
+    /// <summary>Pack name shown in the mod list; null means "Agent Translation Pack (&lt;language&gt;)".</summary>
+    public string? PackDisplayName { get; set; }
+    /// <summary>
+    /// ChineseSimplified (default) or ChineseTraditional. Decides the output folder, the "already translated" check,
+    /// memory sources, the wrong-script validation and the glossary targets. The game matches language folders by full
+    /// name or by the legacy name before the parenthesis, so the legacy name is enough.
+    /// </summary>
+    public string TargetLanguage { get; set; } = TargetLanguages.Simplified;
     public int DefaultBatchSize { get; set; } = 30;
     public int MaxBatchSize { get; set; } = 100;
     public int MaxBatchChars { get; set; } = 12000;
     public List<string> ProperNouns { get; set; } = new();
-    /// <summary>簡中轉繁的自動採用設定；預設關閉（全部只是建議）。只有使用者能改這個檔案，MCP 工具不能改。</summary>
+    /// <summary>Auto-adopting existing Simplified translations; off by default (suggestions only). Only the user edits this file; MCP tools cannot.</summary>
     public SimplifiedAutoAdopt SimplifiedAutoAdopt { get; set; } = new();
+
+    [JsonIgnore]
+    public string TargetLanguageFolder => TargetLanguage;
+
+    [JsonIgnore]
+    public bool IsTraditional => TargetLanguage == TargetLanguages.Traditional;
+
+    [JsonIgnore]
+    public string EffectivePackDisplayName =>
+        string.IsNullOrWhiteSpace(PackDisplayName) || PackDisplayName == OldDefaultDisplayName
+            ? "Agent Translation Pack (" + TargetLanguages.NativeName(TargetLanguage) + ")"
+            : PackDisplayName!;
 
     [JsonIgnore]
     public string WorkDir { get; private set; } = string.Empty;
@@ -37,7 +83,7 @@ public sealed class AppConfig
     [JsonIgnore]
     public string PackDir => Path.Combine(PackOutputRoot, PackFolderName);
 
-    /// <summary>翻譯包所在的上層資料夾。未設定時為 &lt;GameDir&gt;/Mods。</summary>
+    /// <summary>Parent folder of the pack. Defaults to &lt;GameDir&gt;/Mods.</summary>
     [JsonIgnore]
     public string PackOutputRoot => string.IsNullOrWhiteSpace(PackOutputDir) ? Path.Combine(RequireGameDir(), "Mods") : Path.GetFullPath(PackOutputDir!);
 
@@ -45,7 +91,7 @@ public sealed class AppConfig
     {
         if (string.IsNullOrEmpty(GameDir) || !Directory.Exists(GameDir))
         {
-            throw new InvalidOperationException("找不到遊戲資料夾。請在 " + Path.Combine(WorkDir, "config.json") + " 設定 GameDir，或設定環境變數 RWAT_GAME_DIR。");
+            throw new InvalidOperationException("Game folder not found. Set GameDir in " + Path.Combine(WorkDir, "config.json") + " or the RWAT_GAME_DIR environment variable.");
         }
         return GameDir!;
     }
@@ -69,14 +115,8 @@ public sealed class AppConfig
         Directory.CreateDirectory(workDir);
         var path = Path.Combine(workDir, "config.json");
         AppConfig config;
-        if (File.Exists(path))
-        {
-            config = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(path), Json) ?? new AppConfig();
-        }
-        else
-        {
-            config = new AppConfig();
-        }
+        var existingText = File.Exists(path) ? File.ReadAllText(path) : null;
+        config = existingText != null ? JsonSerializer.Deserialize<AppConfig>(existingText, Json) ?? new AppConfig() : new AppConfig();
         config.WorkDir = workDir;
 
         var envGame = Environment.GetEnvironmentVariable("RWAT_GAME_DIR");
@@ -115,31 +155,45 @@ public sealed class AppConfig
         }
         if (!Regex.IsMatch(config.PackFolderName, @"^[A-Za-z0-9!_\-\. ]{1,64}$") || config.PackFolderName.Contains(".."))
         {
-            throw new InvalidOperationException("PackFolderName 只能含英數、!、_、-、.、空白。");
+            throw new InvalidOperationException("PackFolderName may only contain letters, digits, !, _, -, . and spaces.");
         }
-        // 舊版設定檔沒有 simplified_auto_adopt：補上（預設關閉），讓使用者看得到可以改的欄位。
-        if (File.Exists(path) && !File.ReadAllText(path).Contains("\"simplified_auto_adopt\"", StringComparison.Ordinal))
+        if (!TargetLanguages.IsValid(config.TargetLanguage))
+        {
+            throw new InvalidOperationException("target_language must be ChineseSimplified or ChineseTraditional.");
+        }
+        // Older config files lack newer sections: write them back (with defaults) so the user can see what can be changed.
+        if (existingText != null && (!existingText.Contains("\"simplified_auto_adopt\"", StringComparison.Ordinal) || !existingText.Contains("\"target_language\"", StringComparison.Ordinal)))
         {
             detectedNew = true;
         }
-        if (!File.Exists(path) || detectedNew)
+        if (existingText == null || detectedNew)
         {
             File.WriteAllText(path, JsonSerializer.Serialize(config, Json));
+        }
+        // Applied after saving so a temporary override never ends up in config.json.
+        var envLang = Environment.GetEnvironmentVariable("RWAT_TARGET_LANGUAGE");
+        if (!string.IsNullOrWhiteSpace(envLang))
+        {
+            if (!TargetLanguages.IsValid(envLang.Trim()))
+            {
+                throw new InvalidOperationException("RWAT_TARGET_LANGUAGE must be ChineseSimplified or ChineseTraditional.");
+            }
+            config.TargetLanguage = envLang.Trim();
         }
         return config;
     }
 }
 
 /// <summary>
-/// 自動採用條件。只會採用「直接採用」分級的條目，「校對」與「重新翻譯」永遠不會自動採用。
-/// per_mod 的欄位會覆蓋 default 中同名的欄位；未寫的欄位沿用 default。
+/// Auto-adopt conditions. Only entries in the "direct" tier are ever adopted; "review" and "retranslate" never are.
+/// Fields set in per_mod override the same fields of default; fields left out fall back to default.
 /// </summary>
 public sealed class SimplifiedAutoAdopt
 {
-    /// <summary>總開關。false 時 per_mod 也不生效。</summary>
+    /// <summary>Master switch. When false, per_mod has no effect either.</summary>
     public bool Enabled { get; set; }
     public AdoptRule Default { get; set; } = new() { Enabled = true, MinTrust = 80, RequireConfirmedFreshness = true };
-    /// <summary>鍵為 packageId（不分大小寫）。</summary>
+    /// <summary>Keyed by packageId (case-insensitive).</summary>
     public Dictionary<string, AdoptRule> PerMod { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public AdoptRule RuleFor(string packageId)
@@ -160,17 +214,17 @@ public sealed class SimplifiedAutoAdopt
 public sealed class AdoptRule
 {
     public bool? Enabled { get; set; }
-    /// <summary>可信度下限（0–100）。</summary>
+    /// <summary>Minimum trust score (0-100).</summary>
     public int? MinTrust { get; set; }
-    /// <summary>true 時只採用有 EN 註解或同資料夾英文證明為最新的條目。</summary>
+    /// <summary>When true, only entries proven current by an EN comment or same-folder English are adopted.</summary>
     public bool? RequireConfirmedFreshness { get; set; }
-    /// <summary>限定條目類型："keyed"、"def"；null 為全部。</summary>
+    /// <summary>Entry kinds to adopt: "keyed", "def"; null for all.</summary>
     public List<string>? Kinds { get; set; }
-    /// <summary>限定來源類型："mod_self"、"patch"；null 為兩者。疑似機翻來源永遠不會自動採用。</summary>
+    /// <summary>Source kinds to adopt: "mod_self", "patch"; null for both. Suspected machine translations are never adopted.</summary>
     public List<string>? Origins { get; set; }
 }
 
-/// <summary>從 Steam 安裝資料找出 RimWorld 與工坊資料夾。</summary>
+/// <summary>Finds RimWorld and its Workshop folder from the Steam installation data.</summary>
 public static class SteamLocator
 {
     public static string? FindGameDir()

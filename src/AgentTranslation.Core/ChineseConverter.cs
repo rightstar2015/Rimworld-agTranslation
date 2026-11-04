@@ -6,7 +6,7 @@ using System.Text;
 
 namespace AgentTranslation.Core
 {
-    /// <summary>OpenCC 文字字典：每行「鍵\t值1 值2…」，# 開頭為註解。</summary>
+    /// <summary>OpenCC text dictionary: one "key\tvalue1 value2..." per line; lines starting with # are comments.</summary>
     public sealed class PhraseDictionary
     {
         private readonly Dictionary<string, string[]> _map = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -48,7 +48,7 @@ namespace AgentTranslation.Core
 
         public bool TryGet(string key, out string[] values) => _map.TryGetValue(key, out values!);
 
-        /// <summary>從 text[pos] 開始找最長的鍵。</summary>
+        /// <summary>Finds the longest key starting at text[pos].</summary>
         public bool TryMatchLongest(string text, int pos, out int length, out string[] values)
         {
             var max = Math.Min(MaxKeyLength, text.Length - pos);
@@ -68,13 +68,13 @@ namespace AgentTranslation.Core
 
     public enum SegmentSource
     {
-        /// <summary>未轉換（非中文或字典中沒有）。</summary>
+        /// <summary>Not converted (not Chinese, or not in any dictionary).</summary>
         Unchanged,
-        /// <summary>遊戲術語表（最高優先）。</summary>
+        /// <summary>Game or user glossary (highest priority).</summary>
         Glossary,
-        /// <summary>OpenCC 詞組（STPhrases）。</summary>
+        /// <summary>OpenCC phrase (STPhrases).</summary>
         Phrase,
-        /// <summary>OpenCC 單字（STCharacters）。</summary>
+        /// <summary>OpenCC single character (STCharacters).</summary>
         Character,
     }
 
@@ -91,10 +91,10 @@ namespace AgentTranslation.Core
 
         public string Source { get; }
         public string Result { get; set; }
-        /// <summary>第 1 步（簡轉繁）的結果，台灣化之前。</summary>
+        /// <summary>Result of step 1 (script conversion), before Taiwan localisation.</summary>
         public string Converted { get; }
         public SegmentSource Kind { get; }
-        /// <summary>單字轉換時，字典列出的其他候選（一對多）。非空即為歧義。</summary>
+        /// <summary>Other candidates listed by the dictionary for a single character (one-to-many). Non-empty means ambiguous.</summary>
         public string[] Alternatives { get; }
         public bool Ambiguous => Kind == SegmentSource.Character && Alternatives.Length > 0;
     }
@@ -108,11 +108,11 @@ namespace AgentTranslation.Core
     }
 
     /// <summary>
-    /// 簡體 → 繁體（台灣）轉換，依 OpenCC s2twp 設定的流程自行實作：
-    /// 1. 斷詞並轉換：遊戲術語表 → STPhrases → STCharacters，皆為由左至右最長匹配。
-    /// 2. 台灣化：對第 1 步的每個片段，依序以 TWPhrases → TWVariantsPhrases → TWVariants 最長匹配（先命中者優先）。
-    /// 術語表片段不再台灣化（術語表本身就是繁中官方用字）。
-    /// 與 OpenCC 的差異：未使用建置時產生的 STPhrases_GeneratedFromRegionalPhrases，斷詞為簡單最長匹配而非 mmseg。
+    /// Simplified to Traditional (Taiwan) conversion, a re-implementation of the OpenCC s2twp pipeline:
+    /// 1. Segment and convert: glossary, then STPhrases, then STCharacters, each by left-to-right longest match.
+    /// 2. Taiwan localisation: TWPhrases, then TWVariantsPhrases, then TWVariants, by longest match (first dictionary that hits wins).
+    /// Glossary segments are not localised again (the glossary already holds the official Traditional form).
+    /// Differences from OpenCC: no build-time STPhrases_GeneratedFromRegionalPhrases, and simple longest match instead of mmseg.
     /// </summary>
     public sealed class ChineseConverter
     {
@@ -175,7 +175,7 @@ namespace AgentTranslation.Core
                 if (_stCharacters.TryGet(ch, out var cval))
                 {
                     FlushUnchanged();
-                    // 只有在候選中「有與原字不同的其他選項」時才算歧義。
+                    // Ambiguous only when the candidates include an option different from the first one.
                     var alts = cval.Skip(1).Where(v => v != cval[0]).ToArray();
                     result.Segments.Add(new ConversionSegment(ch, cval[0], SegmentSource.Character, alts.Length > 0 ? alts : null));
                 }
@@ -195,9 +195,9 @@ namespace AgentTranslation.Core
                 }
                 seg.Result = Taiwanize(seg.Result);
             }
-            // 台灣詞組（例如 軟件→軟體）常橫跨第 1 步的多個單字片段。OpenCC 以建置時產生的
-            // STPhrases_GeneratedFromRegionalPhrases 讓這些詞成為一個片段；這裡改為對「連續的非術語表片段」
-            // 整段再做一次台灣化，效果相同。術語表片段是邊界，不會被改動。
+            // Taiwan phrases (e.g. 软件 -> 軟體) often span several step-1 character segments. OpenCC solves this with the
+            // build-time STPhrases_GeneratedFromRegionalPhrases; here every run of non-glossary segments is localised again
+            // as a whole, which has the same effect. Glossary segments act as boundaries and are never changed.
             var sb = new StringBuilder();
             var run = new StringBuilder();
             foreach (var seg in result.Segments)

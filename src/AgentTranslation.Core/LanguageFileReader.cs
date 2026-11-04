@@ -6,7 +6,7 @@ using System.Xml.Linq;
 
 namespace AgentTranslation.Core
 {
-    /// <summary>從某語言資料夾（或官方 .tar）讀出的一筆翻譯。</summary>
+    /// <summary>One translation read from a language folder (or an official .tar).</summary>
     public sealed class LanguageRecord
     {
         public LanguageRecord(EntryKind kind, string? defType, string path, string text, string? englishComment, string file)
@@ -20,18 +20,18 @@ namespace AgentTranslation.Core
         }
 
         public EntryKind Kind { get; }
-        /// <summary>DefInjected 資料夾名稱（可能是舊式複數，例如 ThingDefs）。</summary>
+        /// <summary>DefInjected folder name (may be an old plural form such as ThingDefs).</summary>
         public string? DefType { get; }
         public string Path { get; }
         public string Text { get; }
-        /// <summary>緊接在元素前、以 "EN:" 開頭的註解內容（遊戲「產生翻譯檔」與多數翻譯工具會寫入）。</summary>
+        /// <summary>Content of the comment right before the element that starts with "EN:" (written by the game's translation file generator and most tools).</summary>
         public string? EnglishComment { get; }
         public string File { get; }
 
-        /// <summary>與 SourceEntry.CanonicalPath 相同的鍵。</summary>
+        /// <summary>Same key as SourceEntry.CanonicalPath.</summary>
         public string CanonicalPath => Kind == EntryKind.Def ? DefType + ":" + Path : Path;
 
-        /// <summary>DefType 去掉結尾 s 的版本（遊戲找不到型別時也會這樣嘗試）。</summary>
+        /// <summary>DefType without a trailing s (the game tries this too when a type is not found).</summary>
         public string? CanonicalPathSingular =>
             Kind == EntryKind.Def && DefType != null && DefType.Length > 3 && DefType.EndsWith("s", StringComparison.Ordinal)
                 ? DefType.Substring(0, DefType.Length - 1) + ":" + Path
@@ -39,12 +39,12 @@ namespace AgentTranslation.Core
     }
 
     /// <summary>
-    /// 讀取一個語言資料夾的 Keyed 與 DefInjected，保留 EN 註解。
-    /// 只處理字串值；整串清單（&lt;li&gt;）翻譯略過。
+    /// Reads the Keyed and DefInjected files of a language folder, keeping EN comments.
+    /// Only string values are handled; full-list (&lt;li&gt;) translations are skipped.
     /// </summary>
     public static class LanguageFileReader
     {
-        /// <summary>files：相對於語言資料夾的路徑（'/' 分隔）與開啟串流的函式。</summary>
+        /// <summary>files: path relative to the language folder ('/'-separated) and a function that opens the stream.</summary>
         public static IEnumerable<LanguageRecord> Read(IEnumerable<(string RelativePath, Func<Stream> Open)> files)
         {
             foreach (var (rel, open) in files)
@@ -134,7 +134,7 @@ namespace AgentTranslation.Core
             }
         }
 
-        /// <summary>比較英文時的正規化：字面 \n 與換行視為相同、空白合併、去頭尾。</summary>
+        /// <summary>Normalisation for comparing English: literal \n equals a newline, whitespace collapsed, trimmed.</summary>
         public static string NormalizeEnglish(string s)
         {
             var t = (s ?? string.Empty).Replace("\\n", "\n").Replace("\r", string.Empty);

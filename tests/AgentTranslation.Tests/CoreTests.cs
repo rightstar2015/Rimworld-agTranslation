@@ -96,10 +96,12 @@ public class PathSandboxTests
 
 public class ValidatorTests
 {
+    private static readonly ValidatorOptions Tc = new() { Script = TargetScript.Traditional };
+
     [Fact]
     public void Accepts_GoodTranslation()
     {
-        var r = Validator.Validate("Installed mod-version: {0}", "已安裝的模組版本：{0}");
+        var r = Validator.Validate("Installed mod-version: {0}", "已安裝的模組版本：{0}", Tc);
         Assert.True(r.Accepted);
         Assert.Empty(r.Flags);
     }
@@ -117,7 +119,7 @@ public class ValidatorTests
     [InlineData("Hello there", "你好\u0001", "invalid_xml_chars")]
     public void Rejects(string source, string translation, string code)
     {
-        var r = Validator.Validate(source, translation);
+        var r = Validator.Validate(source, translation, Tc);
         Assert.False(r.Accepted);
         Assert.Contains(r.Rejects, i => i.Code == code);
     }
@@ -125,7 +127,7 @@ public class ValidatorTests
     [Fact]
     public void Conditional_AllowsTranslatedBranches()
     {
-        var r = Validator.Validate("{PAWN_gender ? He : She} left.", "{PAWN_gender ? 他 : 她}離開了。");
+        var r = Validator.Validate("{PAWN_gender ? He : She} left.", "{PAWN_gender ? 他 : 她}離開了。", Tc);
         Assert.True(r.Accepted);
     }
 
@@ -142,7 +144,7 @@ public class ValidatorTests
     [Fact]
     public void Traditional_NotFlaggedAsSimplified()
     {
-        Assert.True(Validator.Validate("Turret settings here", "砲塔設定在這裡，意志堅定，北斗。").Accepted);
+        Assert.True(Validator.Validate("Turret settings here", "砲塔設定在這裡，意志堅定，北斗。", Tc).Accepted);
     }
 }
 

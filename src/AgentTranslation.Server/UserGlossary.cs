@@ -9,32 +9,37 @@ using AgentTranslation.Core;
 namespace AgentTranslation.Server;
 
 /// <summary>
-/// 一筆使用者術語。
-/// kind = "s2t"：簡中詞 → 繁中詞，參與簡轉繁（優先於官方術語與 OpenCC）。
-/// kind = "en"：英文詞 → 繁中譯名，在 get_batch 中提示 Agent 保持一致。
-/// origin：builtin（內建）、user（使用者以 CLI 新增）、agent（經 MCP glossary_add 新增）。
+/// One glossary entry.
+/// kind = "s2t": Simplified term -> Traditional term, used when converting Simplified to Traditional (wins over official terms and OpenCC).
+/// kind = "en": English term -> translation in <see cref="Language"/>, shown to agents in get_batch for consistency.
+/// origin: builtin, user (added with the CLI) or agent (added through MCP glossary_add).
 /// </summary>
 public sealed class GlossaryEntry
 {
     public string Kind { get; set; } = "en";
     public string Source { get; set; } = string.Empty;
     public string Target { get; set; } = string.Empty;
+    /// <summary>Target language of an "en" entry. Entries written before languages existed are Traditional.</summary>
+    public string? Language { get; set; }
     public string? Note { get; set; }
     public string Origin { get; set; } = "user";
     public DateTime UpdatedUtc { get; set; }
+
+    /// <summary>The language of the target text: always Traditional for s2t.</summary>
+    public string TargetLanguage => Kind == "s2t" ? TargetLanguages.Traditional : Language ?? TargetLanguages.Traditional;
 }
 
-/// <summary>工作資料夾內的 glossary.json。只有這個類別會寫入它。</summary>
+/// <summary>glossary.json in the work folder. This class is the only writer.</summary>
 public sealed class UserGlossary
 {
     public const int MaxEntries = 5000;
     private static readonly Regex EnglishTerm = new(@"^[A-Za-z0-9][A-Za-z0-9 '\-\.]{0,63}$", RegexOptions.CultureInvariant);
 
-    /// <summary>OpenCC 沒處理、但台灣慣用的寫法。只放查證過的少數詞，其餘交給使用者新增。</summary>
+    /// <summary>Taiwan forms OpenCC does not produce. Only a few verified terms; users add the rest.</summary>
     public static readonly IReadOnlyList<GlossaryEntry> Builtin = new[]
     {
-        new GlossaryEntry { Kind = "s2t", Source = "身份", Target = "身分", Note = "教育部用字", Origin = "builtin" },
-        new GlossaryEntry { Kind = "s2t", Source = "调试", Target = "偵錯", Note = "台灣軟體用語（debug）", Origin = "builtin" },
+        new GlossaryEntry { Kind = "s2t", Source = "身份", Target = "身分", Note = "Ministry of Education form", Origin = "builtin" },
+        new GlossaryEntry { Kind = "s2t", Source = "调试", Target = "偵錯", Note = "Taiwan software term for debug", Origin = "builtin" },
     };
 
     private readonly string _path;
@@ -46,9 +51,18 @@ public sealed class UserGlossary
 
     public List<GlossaryEntry> Entries { get; private set; } = new();
 
-    /// <summary>內建 + 檔案內容；同 kind+source 時檔案內容優先。</summary>
+    /// <summary>Built-in plus file entries; on the same kind+source(+language) the file wins.</summary>
     public IEnumerable<GlossaryEntry> Effective =>
-        Entries.Concat(Builtin.Where(b => !Entries.Any(e => e.Kind == b.Kind && e.Source == b.Source)));
+        Entries.Concat(Builtin.Where(b => !Entries.Any(e => SameKey(e, b.Kind, b.Source, b.TargetLanguage))));
+
+    /// <summary>Entries relevant to a target language: its "en" entries, plus s2t entries in Traditional mode.</summary>
+    public IEnumerable<GlossaryEntry> For(string language) =>
+        Effective.Where(e => e.Kind == "en" ? e.TargetLanguage == language : language == TargetLanguages.Traditional);
+
+    private static bool SameKey(GlossaryEntry e, string kind, string source, string language) =>
+        e.Kind == kind
+        && e.TargetLanguage == language
+        && string.Equals(e.Source, source, kind == "en" ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     public static UserGlossary Load(string workDir)
     {
@@ -58,73 +72,94 @@ public sealed class UserGlossary
             var info = new FileInfo(g._path);
             if (info.Length > 8 * 1024 * 1024)
             {
-                throw new InvalidOperationException("glossary.json 超過 8 MB。");
+                throw new InvalidOperationException("glossary.json is larger than 8 MB.");
             }
             var list = JsonSerializer.Deserialize<List<GlossaryEntry>>(File.ReadAllText(g._path), AppConfig.Json) ?? new();
-            // 檔案可能被手動編輯：逐筆驗證，不合格的略過。
-            g.Entries = list.Where(e => Check(e.Kind, e.Source, e.Target, e.Note) == null).Take(MaxEntries).ToList();
+            // The file may be edited by hand: validate every entry and skip invalid ones.
+            g.Entries = list.Where(e => Check(e.Kind, e.Source, e.Target, e.Note, e.TargetLanguage) == null).Take(MaxEntries).ToList();
         }
         return g;
     }
 
-    /// <summary>驗證一筆術語；合格回傳 null，否則回傳原因。</summary>
-    public static string? Check(string? kind, string? source, string? target, string? note)
+    /// <summary>Validates an entry; returns null when valid, otherwise the reason.</summary>
+    public static string? Check(string? kind, string? source, string? target, string? note, string? language)
     {
         if (kind is not ("s2t" or "en"))
         {
-            return "kind 必須是 s2t 或 en。";
+            return "kind must be s2t or en.";
+        }
+        if (!TargetLanguages.IsValid(language))
+        {
+            return "language must be ChineseSimplified or ChineseTraditional.";
+        }
+        if (kind == "s2t" && language != TargetLanguages.Traditional)
+        {
+            return "s2t entries always target ChineseTraditional.";
         }
         if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(target))
         {
-            return "source 與 target 不可為空。";
+            return "source and target must not be empty.";
         }
         if (target.Length > 64 || target.Any(char.IsControl) || target.IndexOfAny(new[] { '<', '>', '{', '}' }) >= 0)
         {
-            return "target 最多 64 字，且不可含控制字元或 < > { }。";
+            return "target must be at most 64 characters, without control characters or < > { }.";
         }
         if (note != null && (note.Length > 200 || note.Any(char.IsControl)))
         {
-            return "note 最多 200 字，且不可含控制字元。";
+            return "note must be at most 200 characters, without control characters.";
         }
-        var simplified = SimplifiedChars.FindIn(target);
-        if (simplified.Count > 0)
+        var wrong = language == TargetLanguages.Traditional ? SimplifiedChars.FindIn(target) : TraditionalChars.FindIn(target);
+        if (wrong.Count > 0)
         {
-            return "target 含簡體字：" + string.Join("", simplified.Take(5));
+            return "target contains characters of the other script: " + string.Join("", wrong.Take(5));
         }
         if (kind == "s2t")
         {
-            // 至少 2 字，避免單字規則大範圍改寫所有文字。
+            // At least 2 characters, so one rule cannot rewrite every text.
             if (source.Length < 2 || source.Length > 16 || !source.All(IsCjk) || !target.All(IsCjk))
             {
-                return "s2t 的 source 與 target 必須是 2–16 個中文字。";
+                return "s2t source and target must be 2-16 Chinese characters.";
             }
         }
         else if (!EnglishTerm.IsMatch(source))
         {
-            return "en 的 source 只能是英數、空白、' - .，最多 64 字。";
+            return "en source may contain only letters, digits, spaces, ' - . (at most 64 characters).";
         }
         return null;
     }
 
-    public GlossaryEntry Add(string kind, string source, string target, string? note, string origin)
+    public GlossaryEntry Add(string kind, string source, string target, string? note, string origin, string language)
     {
         source = source.Trim();
         target = target.Trim();
-        var problem = Check(kind, source, target, note);
+        if (kind == "s2t")
+        {
+            language = TargetLanguages.Traditional;
+        }
+        var problem = Check(kind, source, target, note, language);
         if (problem != null)
         {
             throw new ArgumentException(problem);
         }
-        var existing = Entries.FindIndex(e => e.Kind == kind && string.Equals(e.Source, source, kind == "en" ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+        var existing = Entries.FindIndex(e => SameKey(e, kind, source, language));
         if (existing < 0 && Entries.Count >= MaxEntries)
         {
-            throw new ArgumentException("術語表已達上限 " + MaxEntries + " 筆。");
+            throw new ArgumentException("The glossary is full (" + MaxEntries + " entries).");
         }
         if (existing >= 0 && origin == "agent" && Entries[existing].Origin == "user")
         {
-            throw new ArgumentException("此詞由使用者設定，Agent 不能覆蓋：" + source + " → " + Entries[existing].Target);
+            throw new ArgumentException("This term was set by the user and cannot be changed by an agent: " + source + " -> " + Entries[existing].Target);
         }
-        var entry = new GlossaryEntry { Kind = kind, Source = source, Target = target, Note = note, Origin = origin, UpdatedUtc = DateTime.UtcNow };
+        var entry = new GlossaryEntry
+        {
+            Kind = kind,
+            Source = source,
+            Target = target,
+            Language = kind == "en" ? language : null,
+            Note = note,
+            Origin = origin,
+            UpdatedUtc = DateTime.UtcNow,
+        };
         if (existing >= 0)
         {
             Entries[existing] = entry;
@@ -137,9 +172,13 @@ public sealed class UserGlossary
         return entry;
     }
 
-    public bool Remove(string kind, string source)
+    public bool Remove(string kind, string source, string language)
     {
-        var n = Entries.RemoveAll(e => e.Kind == kind && string.Equals(e.Source, source, kind == "en" ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal));
+        if (kind == "s2t")
+        {
+            language = TargetLanguages.Traditional;
+        }
+        var n = Entries.RemoveAll(e => SameKey(e, kind, source, language));
         if (n > 0)
         {
             TranslationStore.WriteAtomic(_path, JsonSerializer.Serialize(Entries, AppConfig.Json));

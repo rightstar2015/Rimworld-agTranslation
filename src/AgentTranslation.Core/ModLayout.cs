@@ -6,11 +6,11 @@ using System.Xml.Linq;
 
 namespace AgentTranslation.Core
 {
-    /// <summary>About/About.xml 的必要欄位。</summary>
+    /// <summary>Required fields of About/About.xml.</summary>
     public sealed class ModAbout
     {
         public string PackageId { get; set; } = string.Empty;
-        /// <summary>About.xml 原樣（保留大小寫，寫 loadAfter 時使用）。</summary>
+        /// <summary>packageId as written in About.xml (case kept; used for loadAfter).</summary>
         public string PackageIdRaw { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Author { get; set; } = string.Empty;
@@ -60,12 +60,12 @@ namespace AgentTranslation.Core
     }
 
     /// <summary>
-    /// 決定一個模組實際載入哪些資料夾（高優先在前）。
-    /// 依 RimWorld 1.7.4998 Assembly-CSharp 的 ModContentPack.InitLoadFolders 行為實作（自行重寫，未複製程式碼）：
-    /// 1. 有 LoadFolders.xml 且定義了版本：用目前版本；沒有就用「≤ 目前版本的最高版本」；再沒有就用 default。
-    ///    清單反向加入，IfModActive／IfModActiveAll／IfModNotActive 不符者略過。
-    /// 2. 否則：根目錄/目前版本 → 若無，取版本資料夾中 ≤ 目前版本的最高者（全部都較新時取最小者）；
-    ///    接著 Common，最後根目錄。
+    /// Decides which folders a mod actually loads (highest priority first).
+    /// Re-implements ModContentPack.InitLoadFolders from RimWorld 1.7.4998 Assembly-CSharp (written from scratch, no code copied):
+    /// 1. LoadFolders.xml with versions: use the current version; else the highest version below it; else default.
+    ///    Entries are added in reverse; IfModActive/IfModActiveAll/IfModNotActive that do not match are skipped.
+    /// 2. Otherwise: root/current version; if missing, the highest version folder below current (the lowest if all are newer);
+    ///    then Common, then the root.
     /// </summary>
     public static class LoadFolderResolver
     {
@@ -154,7 +154,7 @@ namespace AgentTranslation.Core
             return result;
         }
 
-        /// <summary>依載入資料夾優先順序，收集 subPath 底下所有 *.xml；同一相對路徑只取最高優先者。</summary>
+        /// <summary>Collects all *.xml under subPath in load-folder priority order; for each relative path only the highest priority file is kept.</summary>
         public static List<(string RelativeToMod, string FullPath)> CollectFiles(string modRoot, List<string> folders, string subPath, string pattern = "*.xml")
         {
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

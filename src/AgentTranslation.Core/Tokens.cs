@@ -7,15 +7,15 @@ namespace AgentTranslation.Core
 {
     public enum TokenKind
     {
-        /// <summary>{0}、{0:F1}、{PAWN_nameDef}、{PAWN_gender ? 他 : 她}（只比對 ? 前的名稱）。</summary>
+        /// <summary>{0}, {0:F1}, {PAWN_nameDef}, {PAWN_gender ? he : she} (conditionals compare only the name before ?).</summary>
         Brace,
-        /// <summary>&lt;color=#fff&gt;、&lt;/color&gt;、&lt;b&gt; 等，對應遊戲 ColoredText.XMLRegex。</summary>
+        /// <summary>&lt;color=#fff&gt;, &lt;/color&gt;, &lt;b&gt; and similar; matches the game's ColoredText.XMLRegex.</summary>
         Markup,
-        /// <summary>(*Threat)、(/Threat)，對應遊戲 ColoredText.TagRegex。</summary>
+        /// <summary>(*Threat), (/Threat); matches the game's ColoredText.TagRegex.</summary>
         Tag,
-        /// <summary>[PAWN_nameDef] 類文法 token。</summary>
+        /// <summary>Grammar tokens such as [PAWN_nameDef].</summary>
         Grammar,
-        /// <summary>換行（字面 \n 或實際換行字元）。</summary>
+        /// <summary>A newline (literal \n or an actual newline character).</summary>
         Newline,
     }
 
@@ -29,17 +29,17 @@ namespace AgentTranslation.Core
         }
 
         public TokenKind Kind { get; }
-        /// <summary>原文中的完整片段。</summary>
+        /// <summary>The full token text in the source.</summary>
         public string Text { get; }
-        /// <summary>比對用的鍵：條件式只保留名稱；其他為完整片段。</summary>
+        /// <summary>Comparison key: the name only for conditionals; the full text otherwise.</summary>
         public string CompareKey { get; }
     }
 
     /// <summary>
-    /// 從字串中找出必須原樣保留的 token。
-    /// 已對照 RimWorld 1.7.4998 Assembly-CSharp：ColoredText.TagRegex = \([\*\/][^\)]*\)、
-    /// ColoredText.XMLRegex = &lt;[^&gt;]*&gt;、DirectXmlLoaderSimple 與 DefInjectionPackage 載入時把字面 \n 轉成換行。
-    /// 大括號 token 的完整語法【未確認】，目前以 {…} 整段比對，條件式只比 ? 前的名稱。
+    /// Finds the tokens that must be kept unchanged.
+    /// Checked against RimWorld 1.7.4998 Assembly-CSharp: ColoredText.TagRegex = \([\*\/][^\)]*\),
+    /// ColoredText.XMLRegex = &lt;[^&gt;]*&gt;; DirectXmlLoaderSimple and DefInjectionPackage turn a literal \n into a newline on load.
+    /// The full brace token grammar is [unverified]; {...} is matched as a whole, conditionals by the name before ?.
     /// </summary>
     public static class Tokens
     {
@@ -49,8 +49,8 @@ namespace AgentTranslation.Core
         private static readonly Regex GrammarRegex = new Regex(@"\[[A-Za-z_][A-Za-z0-9_]*\]", RegexOptions.CultureInvariant);
 
         /// <summary>
-        /// includeGrammar：是否把 [xxx] 當成文法 token。只有 RulePack 規則字串需要；
-        /// 一般 Keyed／Def 文字中的方括號是普通文字（例如「[Zone] 分頁」）。
+        /// includeGrammar: whether [xxx] counts as a grammar token. Only RulePack rule strings need this;
+        /// square brackets in ordinary Keyed/Def text are plain text (e.g. "[Zone] tab").
         /// </summary>
         public static List<Token> Extract(string text, bool includeGrammar = false)
         {
@@ -91,7 +91,7 @@ namespace AgentTranslation.Core
             return result;
         }
 
-        /// <summary>移除所有 token 後的文字，用於長度比較與簡體字偵測。</summary>
+        /// <summary>Text with all tokens removed; used for length comparison and script detection.</summary>
         public static string StripTokens(string text)
         {
             if (string.IsNullOrEmpty(text))
@@ -105,7 +105,7 @@ namespace AgentTranslation.Core
             return s;
         }
 
-        /// <summary>回傳 (缺少的, 多出來的) token，依種類分組。</summary>
+        /// <summary>Returns (missing, extra) tokens grouped by kind.</summary>
         public static Dictionary<TokenKind, (List<string> Missing, List<string> Extra)> Diff(string source, string translation, bool includeGrammar = false)
         {
             var src = Extract(source, includeGrammar);

@@ -11,9 +11,9 @@ using AgentTranslation.Core;
 namespace AgentTranslation.Server;
 
 /// <summary>
-/// 以 System.Reflection.Metadata 唯讀解析遊戲與模組組件的型別中繼資料。
-/// 不載入、不執行組件程式碼。型別名稱解析規則對照 RimWorld 1.7.4998 GenTypes.GetTypeInAnyAssembly：
-/// 先找完整名稱，再依序嘗試 RimWorld、Verse、LudeonTK、Verse.AI … 等命名空間。
+/// Read-only type metadata of game and mod assemblies via System.Reflection.Metadata.
+/// Never loads or executes assembly code. Type name resolution follows RimWorld 1.7.4998 GenTypes.GetTypeInAnyAssembly:
+/// full name first, then the RimWorld, Verse, LudeonTK, Verse.AI ... namespaces in order.
 /// </summary>
 public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
 {
@@ -59,7 +59,7 @@ public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
         }
         catch (Exception ex) when (ex is BadImageFormatException or IOException or InvalidOperationException)
         {
-            Warnings.Add("略過無法解析的組件 " + Path.GetFileName(path) + "：" + ex.Message);
+            Warnings.Add("Skipped an assembly that could not be read: " + Path.GetFileName(path) + ": " + ex.Message);
         }
     }
 
@@ -91,7 +91,9 @@ public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
         TypeShape? shape = null;
         if (_types.ContainsKey(fullName))
         {
-            shape = new TypeShape { FullName = fullName, IsDef = InheritsFrom(fullName, "Verse.Def") };
+            var (reader, handle) = _types[fullName];
+            var isAbstract = (reader.GetTypeDefinition(handle).Attributes & System.Reflection.TypeAttributes.Abstract) != 0;
+            shape = new TypeShape { FullName = fullName, IsDef = InheritsFrom(fullName, "Verse.Def"), IsAbstract = isAbstract };
         }
         _shapeCache[fullName] = shape;
         return shape;
@@ -103,6 +105,28 @@ public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
         return fields.TryGetValue(xmlName, out var f) ? f : null;
     }
 
+    public IReadOnlyList<TypeShape> DefChain(TypeShape type)
+    {
+        var list = new List<TypeShape>();
+        string? current = type.FullName;
+        for (int guard = 0; guard < 64 && current != null && current != "Verse.Def"; guard++)
+        {
+            var shape = GetByFullName(current);
+            if (shape == null)
+            {
+                break;
+            }
+            list.Add(shape);
+            current = BaseTypeName(current);
+        }
+        return list;
+    }
+
+    public string XmlNameOf(TypeShape type)
+    {
+        var shortName = type.FullName.Substring(type.FullName.LastIndexOf('.') + 1);
+        return ResolveXmlTypeName(shortName)?.FullName == type.FullName ? shortName : type.FullName;
+    }
     private bool InheritsFrom(string fullName, string baseName)
     {
         var current = fullName;
@@ -131,7 +155,7 @@ public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
         return TypeNameOfHandle(t.Reader, def.BaseType);
     }
 
-    /// <summary>欄位表：鍵為不分大小寫的欄位名稱或 LoadAlias；衍生型別的欄位優先。</summary>
+    /// <summary>Field table keyed by case-insensitive field name or LoadAlias; fields of derived types win.</summary>
     private Dictionary<string, FieldShape> FieldsOf(string fullName)
     {
         if (_fieldCache.TryGetValue(fullName, out var cached))
@@ -225,7 +249,7 @@ public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
 
     private static bool IsListLike(string name) => name is "System.Collections.Generic.List`1" or "System.Collections.Generic.IList`1" or "System.Collections.Generic.IEnumerable`1";
 
-    /// <summary>對應 GenTypes.IsCustomType：命名空間不是 System／UnityEngine／Steamworks 開頭。</summary>
+    /// <summary>Same as GenTypes.IsCustomType: namespace does not start with System, UnityEngine or Steamworks.</summary>
     private static bool IsCustom(string fullName) =>
         !fullName.StartsWith("System", StringComparison.Ordinal) && !fullName.StartsWith("UnityEngine", StringComparison.Ordinal) && !fullName.StartsWith("Steamworks", StringComparison.Ordinal);
 
@@ -282,7 +306,7 @@ public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
         }
     }
 
-    /// <summary>讀取自訂屬性 blob 中第一個字串參數（prolog 0x0001 + SerString）。</summary>
+    /// <summary>Reads the first string argument of a custom attribute blob (prolog 0x0001 + SerString).</summary>
     private static string? ReadFirstStringArg(MetadataReader reader, CustomAttribute attr)
     {
         try
