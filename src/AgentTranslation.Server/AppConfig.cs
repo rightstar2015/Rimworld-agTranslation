@@ -15,7 +15,27 @@ public static class TargetLanguages
     public const string Simplified = "ChineseSimplified";
     public const string Traditional = "ChineseTraditional";
 
+    /// <summary>Setting value meaning "follow the game language".</summary>
+    public const string Auto = "auto";
+
     public static bool IsValid(string? value) => value is Simplified or Traditional;
+
+    /// <summary>
+    /// Target language for a game language folder name from Prefs.xml ("ChineseTraditional (繁體中文)" etc.).
+    /// Null when the game language is not Chinese.
+    /// </summary>
+    public static string? FromGameLanguage(string? gameLanguage)
+    {
+        if (gameLanguage == null)
+        {
+            return null;
+        }
+        if (FolderMatches(gameLanguage, Traditional))
+        {
+            return Traditional;
+        }
+        return FolderMatches(gameLanguage, Simplified) ? Simplified : null;
+    }
 
     public static TargetScript ScriptOf(string language) => language == Traditional ? TargetScript.Traditional : TargetScript.Simplified;
 
@@ -53,11 +73,48 @@ public sealed class AppConfig
     /// <summary>Pack name shown in the mod list; null means "Agent Translation Pack (&lt;language&gt;)".</summary>
     public string? PackDisplayName { get; set; }
     /// <summary>
-    /// ChineseSimplified (default) or ChineseTraditional. Decides the output folder, the "already translated" check,
-    /// memory sources, the wrong-script validation and the glossary targets. The game matches language folders by full
-    /// name or by the legacy name before the parenthesis, so the legacy name is enough.
+    /// "auto" (default: follow the game language, Simplified when the game is not in Chinese), ChineseSimplified or
+    /// ChineseTraditional. Written to config.json as target_language.
     /// </summary>
+    [JsonPropertyName("target_language")]
+    public string TargetLanguageSetting { get; set; } = TargetLanguages.Auto;
+
+    /// <summary>
+    /// Effective target language: ChineseSimplified or ChineseTraditional. Decides the output folder, the "already
+    /// translated" check, memory sources, the wrong-script validation and the glossary targets. The game matches language
+    /// folders by full name or by the legacy name before the parenthesis, so the legacy name is enough.
+    /// Set by <see cref="ResolveTargetLanguage"/> once the game language is known.
+    /// </summary>
+    [JsonIgnore]
     public string TargetLanguage { get; set; } = TargetLanguages.Simplified;
+
+    /// <summary>How the effective target language was chosen (shown in get_environment).</summary>
+    [JsonIgnore]
+    public string TargetLanguageSource { get; private set; } = "default";
+
+    private bool _targetFromEnvironment;
+
+    /// <summary>
+    /// Picks the effective target language: RWAT_TARGET_LANGUAGE, then an explicit setting, then the game language.
+    /// Called once at startup; the pack and stores are bound to it for the life of the process.
+    /// </summary>
+    public void ResolveTargetLanguage(string? gameLanguage)
+    {
+        if (_targetFromEnvironment)
+        {
+            TargetLanguageSource = "RWAT_TARGET_LANGUAGE";
+            return;
+        }
+        if (TargetLanguages.IsValid(TargetLanguageSetting))
+        {
+            TargetLanguage = TargetLanguageSetting;
+            TargetLanguageSource = "config";
+            return;
+        }
+        var fromGame = TargetLanguages.FromGameLanguage(gameLanguage);
+        TargetLanguage = fromGame ?? TargetLanguages.Simplified;
+        TargetLanguageSource = fromGame != null ? "game_language" : "default (game language is not Chinese)";
+    }
     public int DefaultBatchSize { get; set; } = 30;
     public int MaxBatchSize { get; set; } = 100;
     public int MaxBatchChars { get; set; } = 12000;
@@ -159,10 +216,11 @@ public sealed class AppConfig
         {
             throw new InvalidOperationException("PackFolderName may only contain letters, digits, !, _, -, . and spaces.");
         }
-        if (!TargetLanguages.IsValid(config.TargetLanguage))
+        if (!TargetLanguages.IsValid(config.TargetLanguageSetting) && config.TargetLanguageSetting != TargetLanguages.Auto)
         {
-            throw new InvalidOperationException("target_language must be ChineseSimplified or ChineseTraditional.");
+            throw new InvalidOperationException("target_language must be auto, ChineseSimplified or ChineseTraditional.");
         }
+        config.TargetLanguage = TargetLanguages.IsValid(config.TargetLanguageSetting) ? config.TargetLanguageSetting : TargetLanguages.Simplified;
         // Older config files lack newer sections: write them back (with defaults) so the user can see what can be changed.
         if (existingText != null && (!existingText.Contains("\"simplified_auto_adopt\"", StringComparison.Ordinal) || !existingText.Contains("\"target_language\"", StringComparison.Ordinal) || !existingText.Contains("\"code_keys\"", StringComparison.Ordinal)))
         {
@@ -181,6 +239,7 @@ public sealed class AppConfig
                 throw new InvalidOperationException("RWAT_TARGET_LANGUAGE must be ChineseSimplified or ChineseTraditional.");
             }
             config.TargetLanguage = envLang.Trim();
+            config._targetFromEnvironment = true;
         }
         return config;
     }

@@ -25,6 +25,7 @@ public sealed partial class TranslationService : IDisposable
     {
         _config = config;
         _env = GameEnvironment.Load(config);
+        config.ResolveTargetLanguage(_env.Language);
         _scanner = new ModScanner(config, _env);
         _store = new TranslationStore(config.WorkDir, config.TargetLanguage);
         // Install the full character sets before any scan: scans use them to recognise text already in the target script.
@@ -126,7 +127,12 @@ public sealed partial class TranslationService : IDisposable
                 version_folder = _env.Version,
                 game_language = _env.Language,
                 target_language = _config.TargetLanguage,
+                target_language_source = _config.TargetLanguageSource,
                 target_language_matches_game = gameMatches,
+                target_language_note = gameMatches ? null
+                    : _config.TargetLanguageSetting == TargetLanguages.Auto && TargetLanguages.FromGameLanguage(_env.Language) != null
+                        ? "The game language changed after this server started; restart the server to follow it."
+                        : "The pack is built for " + _config.TargetLanguage + "; the game must use that language for the pack to load.",
                 active_mod_count = _env.ActiveIds.Count,
                 active_mods_missing_on_disk = _env.MissingActiveIds,
                 installed_mod_count = _env.Mods.Count,
@@ -231,7 +237,7 @@ public sealed partial class TranslationService : IDisposable
                 target_language = _config.TargetLanguage,
                 load_folders = _env.LoadFoldersFor(mod).Select(f => Path.GetRelativePath(mod.RootDir, f)).ToList(),
                 kinds = byKind,
-                code_keys = _config.CodeKeys.Enabled ? "enabled" : "disabled (the user can enable code_keys in config.json)",
+                code_keys = CodeKeysStatus(mod),
                 pending = scan.Translatable.Count() - done,
                 skipped_ambiguous_examples = scan.Entries.Where(e => scan.Ambiguous.Contains(e.Id)).Take(5).Select(e => e.DefType + ":" + e.InjectionPath).ToList(),
                 stale_pack_translations = stale,
@@ -240,6 +246,26 @@ public sealed partial class TranslationService : IDisposable
                 notes = scan.Notes.GroupBy(n => n.Code).Select(g => new { code = g.Key, count = g.Count(), examples = g.Take(3).Select(n => n.Detail + (n.File == null ? "" : " @ " + n.File)).ToList() }).ToList(),
             };
         }
+    }
+
+    /// <summary>
+    /// Whether keys used in code are offered. When they are not, says how many this mod has so the agent can tell the
+    /// user; only the user can turn the setting on.
+    /// </summary>
+    private object CodeKeysStatus(InstalledMod mod)
+    {
+        if (_config.CodeKeys.Enabled)
+        {
+            return new { enabled = true };
+        }
+        var found = CodeStringsOf(mod).MissingKeys.Count;
+        return new
+        {
+            enabled = false,
+            keys_found = found,
+            hint = found == 0 ? null
+                : "This mod's code uses " + found + " key(s) that no language file defines, so the game shows them as raw key names. Tell the user they can be translated after the user sets code_keys.enabled to true in config.json; do not change it yourself.",
+        };
     }
 
     // ---------- get_batch ----------

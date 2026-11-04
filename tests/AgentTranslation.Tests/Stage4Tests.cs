@@ -139,6 +139,26 @@ public class CodeStringScannerTests
     }
 }
 
+public class TargetLanguageAutoTests
+{
+    [Theory]
+    [InlineData("auto", "ChineseTraditional (繁體中文)", "ChineseTraditional", "game_language")]
+    [InlineData("auto", "ChineseSimplified (简体中文)", "ChineseSimplified", "game_language")]
+    [InlineData("auto", "English", "ChineseSimplified", "default (game language is not Chinese)")]
+    [InlineData("auto", null, "ChineseSimplified", "default (game language is not Chinese)")]
+    [InlineData("ChineseSimplified", "ChineseTraditional (繁體中文)", "ChineseSimplified", "config")]
+    public void PicksTheEffectiveLanguage(string setting, string? game, string expected, string source)
+    {
+        var c = new AppConfig { TargetLanguageSetting = setting };
+        c.ResolveTargetLanguage(game);
+        Assert.Equal(expected, c.TargetLanguage);
+        Assert.Equal(source, c.TargetLanguageSource);
+    }
+
+    [Fact]
+    public void NewConfigsFollowTheGame() => Assert.Equal(TargetLanguages.Auto, new AppConfig().TargetLanguageSetting);
+}
+
 public class CodeKeyValidationTests
 {
     private static readonly ValidatorOptions Sc = new ValidatorOptions { Script = TargetScript.Simplified };

@@ -14,6 +14,14 @@ This tool never calls an AI service and needs no API key. The agent you already 
 - Writes a separate pack mod (`!AgentTranslation_Pack`) that loads after the translated mods. Deleting it removes every translation.
 - Traditional mode can also reuse existing Simplified translations converted with OpenCC (Apache-2.0 dictionaries, embedded).
 
+## Quick start
+
+1. Optional but recommended: enable the `Agent Translation Bridge` mod (any position).
+2. Connect `rwat` to your MCP client (see below). It finds the game, the Workshop folder and your mod list by itself.
+3. Set the game language to Simplified or Traditional Chinese, then ask your agent to translate your active mods and build the pack. Restart the game and enable `Agent Translation Pack`.
+
+No configuration file needs editing for this. A player guide draft (Traditional Chinese) is in `docs/PLAYER_GUIDE.md`.
+
 ## Build
 
 ```bash
@@ -70,7 +78,7 @@ rwat build
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `target_language` | `ChineseSimplified` | `ChineseSimplified` or `ChineseTraditional` |
+| `target_language` | `auto` | `auto` follows the game language (Simplified when the game is not in Chinese); or `ChineseSimplified` / `ChineseTraditional` |
 | `pack_output_dir` | game `Mods` folder | Where the pack folder is written (`RWAT_PACK_OUTPUT_DIR` overrides) |
 | `simplified_auto_adopt.enabled` | `false` | Lets existing Simplified translations be adopted automatically under the conditions you set |
 | `code_keys.enabled` | `false` | Also offers keys that mod code uses but no language file defines (the game shows the raw key). They have no English source, so the agent infers the text; each one is flagged for review |
