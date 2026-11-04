@@ -12,7 +12,7 @@
   <AgentTranslationBridge.NoPack>在已启用的模组中找不到翻译包。</AgentTranslationBridge.NoPack>
   <AgentTranslationBridge.LanguageMismatch>翻译包的语言是 {0}，但游戏语言是 {1}，其译文不会被加载。</AgentTranslationBridge.LanguageMismatch>
   <AgentTranslationBridge.LastReport>上次报告：{0}</AgentTranslationBridge.LastReport>
-  <AgentTranslationBridge.Summary>翻译包条目：{0}。已生效：{1}。被其他模组覆盖：{2}。运行时被更改：{3}。未加载或未注入：{4}。未知：{5}。</AgentTranslationBridge.Summary>
+  <AgentTranslationBridge.Summary>翻译包条目：{0}。已生效：{1}（其中 {6} 条被其他模组附加了内容）。被其他模组覆盖：{2}。运行时被更改：{3}。未加载或未注入：{4}。未知：{5}。</AgentTranslationBridge.Summary>
   <AgentTranslationBridge.ErrorCount>游戏为此语言报告的翻译错误数：{0}</AgentTranslationBridge.ErrorCount>
   <AgentTranslationBridge.ProblemsHeader>有未生效条目的模组：</AgentTranslationBridge.ProblemsHeader>
   <AgentTranslationBridge.ProblemRow>{0}：被覆盖 {1}，被更改 {2}，未生效 {3}</AgentTranslationBridge.ProblemRow>

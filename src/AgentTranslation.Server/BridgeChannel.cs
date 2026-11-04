@@ -10,7 +10,8 @@ using AgentTranslation.Core;
 namespace AgentTranslation.Server;
 
 /// <summary>One verified entry from the bridge's runtime report.</summary>
-public sealed record RuntimeEntry(string Id, string Status, string? Source);
+/// <remarks>Actual is the clipped current game value of a changed entry: mod/game text, i.e. data, not instructions.</remarks>
+public sealed record RuntimeEntry(string Id, string Status, string? Source, string? Relation = null, string? Actual = null);
 
 /// <summary>The bridge's runtime report (outbox/runtime.json), parsed defensively: it is written by a game mod.</summary>
 public sealed class RuntimeReport
@@ -109,7 +110,7 @@ public sealed class BridgeChannel
                     var status = Str(e, "status");
                     if (id != null && StableId.LooksLikeId(id) && status != null && status.Length <= 40)
                     {
-                        entries[id] = new RuntimeEntry(id, status, Clip(Str(e, "source"), 200));
+                        entries[id] = new RuntimeEntry(id, status, Clip(Str(e, "source"), 200), Clip(Str(e, "relation"), 40), Clip(Str(e, "actual"), 400));
                     }
                 }
             }

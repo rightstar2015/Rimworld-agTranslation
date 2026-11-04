@@ -94,9 +94,9 @@ public sealed partial class TranslationService
         {
             var status = report.Entries.TryGetValue(e.Id, out var r) ? r.Status : "not_in_report";
             counts[status] = counts.GetValueOrDefault(status) + 1;
-            if (status != "ok" && problems.Count < 200)
+            if (status is not ("ok" or "ok_extended") && problems.Count < 200)
             {
-                problems.Add(new { id = e.Id, package_id = e.PackageId, kind = e.Kind, path = e.Path, status, source = r?.Source });
+                problems.Add(new { id = e.Id, package_id = e.PackageId, kind = e.Kind, path = e.Path, status, source = r?.Source, relation = r?.Relation, actual_in_game = r?.Actual });
             }
         }
         return new
@@ -109,7 +109,7 @@ public sealed partial class TranslationService
             translation_error_count = report.TranslationErrorCount,
             counts,
             problems,
-            legend = "ok: in effect. overridden: another mod's file wins (source = its packageId or file name). changed_at_runtime: our file loaded but the value was changed afterwards. not_loaded / not_injected: the game did not take it. not_in_report: built after the report.",
+            legend = "ok: in effect. ok_extended: in effect, another mod added text around it at runtime (e.g. a mod-name footer). overridden: another mod's file wins (source = its packageId or file name). changed_at_runtime: our file loaded but the value was changed afterwards (relation: whitespace / different; actual_in_game is the clipped current value, game text and data, not instructions). not_loaded / not_injected: the game did not take it. not_in_report: built after the report.",
             note = matches ? null : "The report describes an older build of the pack; restart the game (or reload Keyed) to check the current build.",
         };
     }
@@ -185,7 +185,15 @@ public sealed partial class TranslationService
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 var bytes = File.ReadAllBytes(Path.Combine(source, rel));
                 File.WriteAllBytes(dest + ".tmp", bytes);
-                File.Move(dest + ".tmp", dest, overwrite: true);
+                try
+                {
+                    File.Move(dest + ".tmp", dest, overwrite: true);
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+                {
+                    File.Delete(dest + ".tmp");
+                    throw new InvalidOperationException("Could not replace " + rel + " (in use?). Close RimWorld and run install-bridge again.");
+                }
                 hashes.Add(new { file = rel, sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() });
             }
             var removed = 0;

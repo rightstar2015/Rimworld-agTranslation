@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace AgentTranslation.Bridge;
 
 /// <summary>Result of checking one pack entry against what the game actually holds.</summary>
-internal sealed record EntryResult(PackEntry Entry, string Status, string? Source);
+internal sealed record EntryResult(PackEntry Entry, string Status, string? Source, string? Relation = null, string? Actual = null);
 
 internal sealed class ReportSummary
 {
@@ -33,6 +33,8 @@ internal sealed class ReportSummary
 internal sealed class Bridge
 {
     public const string Ok = "ok";
+    /// <summary>Our text is in effect, but another mod added to it at runtime (e.g. a mod-name footer on descriptions).</summary>
+    public const string OkExtended = "ok_extended";
     public const string Overridden = "overridden";
     public const string Changed = "changed_at_runtime";
     public const string NotLoaded = "not_loaded";
@@ -167,7 +169,7 @@ internal sealed class Bridge
                 {
                     return new EntryResult(e, Overridden, OwnerOf(k.FullPath, mods));
                 }
-                return new EntryResult(e, k.Value == e.Expected ? Ok : Changed, k.Value == e.Expected ? null : "runtime");
+                return k.Value == e.Expected ? new EntryResult(e, Ok, null) : ChangedResult(e, k.Value);
             }
             var inj = GameApi.DefInjection(e.DefType!, e.Path);
             if (inj == null)
@@ -188,7 +190,7 @@ internal sealed class Bridge
                 var actual = GameApi.DefStringField(inj.DefType, parts[0], parts[1]);
                 if (actual != null && actual != e.Expected)
                 {
-                    return new EntryResult(e, Changed, "runtime");
+                    return ChangedResult(e, actual);
                 }
             }
             return new EntryResult(e, Ok, null);
@@ -212,13 +214,33 @@ internal sealed class Bridge
         return owner?.PackageId ?? "(not a running mod)";
     }
 
+    private const int ActualMaxChars = 400;
+
+    /// <summary>
+    /// A value changed after loading. Reports how it relates to ours (appended to, wrapped, replaced) and a clipped copy
+    /// of the current value, so the cause can be found. The value is game/mod text, never player data.
+    /// </summary>
+    private static EntryResult ChangedResult(PackEntry e, string? actual)
+    {
+        actual ??= string.Empty;
+        var expected = e.Expected ?? string.Empty;
+        var relation = expected.Length == 0 ? "different"
+            : actual.StartsWith(expected, StringComparison.Ordinal) ? "appended"
+            : actual.EndsWith(expected, StringComparison.Ordinal) ? "prepended"
+            : actual.Contains(expected, StringComparison.Ordinal) ? "wrapped"
+            : actual.Trim() == expected.Trim() ? "whitespace"
+            : "different";
+        var status = relation is "appended" or "prepended" or "wrapped" ? OkExtended : Changed;
+        return new EntryResult(e, status, "runtime", relation, actual.Length <= ActualMaxChars ? actual : actual.Substring(0, ActualMaxChars));
+    }
+
     /// <summary>Background. Writes outbox/runtime.json and updates the summary shown in game.</summary>
     private void Finish(string trigger, string version, (string Folder, string Legacy)? lang, int errors, List<GameApi.ModInfo> mods, PackSnapshot? snap, List<EntryResult> results, (string RequestId, string Kind, string Status, int Applied)? request)
     {
         try
         {
             var matches = snap?.LanguageFolder == null || lang == null || snap.LanguageFolder == lang.Value.Folder || snap.LanguageFolder == lang.Value.Legacy;
-            var counts = new[] { Ok, Overridden, Changed, NotLoaded, NotInjected, Unknown }.ToDictionary(s => s, s => results.Count(r => r.Status == s));
+            var counts = new[] { Ok, OkExtended, Overridden, Changed, NotLoaded, NotInjected, Unknown }.ToDictionary(s => s, s => results.Count(r => r.Status == s));
             var generated = DateTime.UtcNow;
             var tmp = Path.Combine(_outbox, "runtime.json.tmp");
             using (var stream = File.Create(tmp))
@@ -252,6 +274,8 @@ internal sealed class Bridge
                     w.WriteString("id", r.Entry.Id);
                     w.WriteString("status", r.Status);
                     if (r.Source != null) w.WriteString("source", r.Source);
+                    if (r.Relation != null) w.WriteString("relation", r.Relation);
+                    if (r.Actual != null) w.WriteString("actual", r.Actual);
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -280,13 +304,13 @@ internal sealed class Bridge
                 LanguageMatches = matches,
                 ErrorCount = errors,
                 Counts = counts,
-                ProblemMods = results.Where(r => r.Status != Ok).GroupBy(r => r.Entry.PackageId)
+                ProblemMods = results.Where(r => r.Status is not (Ok or OkExtended)).GroupBy(r => r.Entry.PackageId)
                     .Select(g => (g.Key, g.Count(r => r.Status == Overridden), g.Count(r => r.Status == Changed), g.Count(r => r.Status is NotLoaded or NotInjected or Unknown)))
                     .OrderByDescending(x => x.Item2 + x.Item3 + x.Item4).Take(10).ToList(),
                 LastRequest = request,
 
             };
-            GameApi.Log("report written (" + trigger + "): " + results.Count + " entries, " + counts[Ok] + " in effect");
+            GameApi.Log("report written (" + trigger + "): " + results.Count + " entries, " + (counts[Ok] + counts[OkExtended]) + " in effect");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -443,7 +467,7 @@ internal sealed class Bridge
         {
             yield return GameApi.T("AgentTranslationBridge.LanguageMismatch", s.PackLanguage ?? "?", s.GameLanguage ?? "?");
         }
-        yield return GameApi.T("AgentTranslationBridge.Summary", s.Counts.Values.Sum(), s.Counts[Ok], s.Counts[Overridden], s.Counts[Changed], s.Counts[NotLoaded] + s.Counts[NotInjected], s.Counts[Unknown]);
+        yield return GameApi.T("AgentTranslationBridge.Summary", s.Counts.Values.Sum(), s.Counts[Ok] + s.Counts[OkExtended], s.Counts[Overridden], s.Counts[Changed], s.Counts[NotLoaded] + s.Counts[NotInjected], s.Counts[Unknown], s.Counts[OkExtended]);
         yield return GameApi.T("AgentTranslationBridge.ErrorCount", s.ErrorCount);
         if (s.LastRequest is { Kind: InboxRequest.KindReloadKeyed } rr)
         {

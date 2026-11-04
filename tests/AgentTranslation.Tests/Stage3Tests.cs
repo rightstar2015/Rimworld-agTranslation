@@ -188,7 +188,7 @@ public class BridgeChannelTests
             "{\"schema\":1,\"generated_utc\":\"2026-11-04T10:00:00Z\",\"language_folder\":\"ChineseSimplified (简体中文)\",\"translation_error_count\":1314," +
             "\"pack\":{\"found\":true,\"manifest_built_utc\":\"X\",\"language_matches_game\":true}," +
             "\"summary\":{\"total\":2,\"ok\":1}," +
-            "\"entries\":[{\"id\":\"" + good + "\",\"status\":\"ok\"},{\"id\":\"../bad\",\"status\":\"ok\"},{\"id\":\"" + good.Replace('a', 'b') + "\",\"status\":\"overridden\",\"source\":\"other.mod\"}]}");
+            "\"entries\":[{\"id\":\"" + good + "\",\"status\":\"ok\"},{\"id\":\"../bad\",\"status\":\"ok\"},{\"id\":\"" + good.Replace('a', 'b') + "\",\"status\":\"overridden\",\"source\":\"other.mod\"},{\"id\":\"" + good.Replace('a', 'c') + "\",\"status\":\"changed_at_runtime\",\"source\":\"runtime\",\"relation\":\"appended\",\"actual\":\"" + new string('x', 500) + "\"}]}");
         var old = Environment.GetEnvironmentVariable("RWAT_BRIDGE_DIR");
         Environment.SetEnvironmentVariable("RWAT_BRIDGE_DIR", dir);
         try
@@ -197,8 +197,11 @@ public class BridgeChannelTests
             Assert.NotNull(r);
             Assert.True(r!.PackFound);
             Assert.Equal(1314, r.TranslationErrorCount);
-            Assert.Equal(2, r.Entries.Count);
+            Assert.Equal(3, r.Entries.Count);
             Assert.Equal("other.mod", r.Entries[good.Replace('a', 'b')].Source);
+            var changed = r.Entries[good.Replace('a', 'c')];
+            Assert.Equal("appended", changed.Relation);
+            Assert.Equal(400, changed.Actual!.Length);
         }
         finally
         {
