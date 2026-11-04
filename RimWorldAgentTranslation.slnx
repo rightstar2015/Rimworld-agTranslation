@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AgentTranslation.Core/AgentTranslation.Core.csproj" />
+    <Project Path="src/AgentTranslation.Server/AgentTranslation.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AgentTranslation.Tests/AgentTranslation.Tests.csproj" />
+  </Folder>
+</Solution>

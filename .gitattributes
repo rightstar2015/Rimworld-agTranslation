@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.cs text eol=lf
+*.md text eol=lf
+*.sln text eol=crlf
+*.slnx text eol=lf
+*.txt text eol=lf

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 零外部相依：只用 BCL，讓遊戲端模組也能引用。 -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>AgentTranslation.Core</RootNamespace>
+  </PropertyGroup>
+</Project>
