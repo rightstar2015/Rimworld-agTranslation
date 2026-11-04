@@ -51,7 +51,7 @@ rwat 會自己找到遊戲資料夾、Workshop 資料夾和你的模組清單。
 | 補上模組漏定義的鍵 | `config.json` 的 `code_keys.enabled` | 有些模組的介面連英文都顯示成 `Some.Key.Name`。開啟後助理會依鍵名推測譯文，每筆都會標示為推測 |
 | 自動採用既有的簡中譯文（繁中模式） | `config.json` 的 `simplified_auto_adopt.enabled` | 依你設定的條件，把現成的簡中譯文轉成繁中直接使用 |
 
-`config.json` 在 `%LOCALAPPDATA%\RimWorldAgentTranslation\`。助理沒辦法替你打開這些選項。
+`config.json` 在遊戲的存檔資料夾旁邊：`%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\AgentTranslation`（和 `Saves`、`Config` 同一層）。助理沒辦法替你打開這些選項。
 
 ## 常見問題
 

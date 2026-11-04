@@ -27,7 +27,7 @@ internal sealed class ReportSummary
 /// <summary>
 /// Bridge logic. Threads: the game's main thread runs Tick, the verification chunks and every GameApi call;
 /// a background thread polls the inbox and all file reads and writes run on background tasks.
-/// Fixed locations only: %LOCALAPPDATA%\RimWorldAgentTranslation\bridge (or RWAT_BRIDGE_DIR) for inbox/outbox,
+/// Fixed locations only: &lt;game data folder&gt;\AgentTranslation\bridge (or RWAT_BRIDGE_DIR) for inbox/outbox,
 /// and the pack folder found among the running mods for reading.
 /// </summary>
 internal sealed class Bridge
@@ -59,9 +59,10 @@ internal sealed class Bridge
     {
         _mod = mod;
         var custom = Environment.GetEnvironmentVariable("RWAT_BRIDGE_DIR");
+        // The game's data folder (Saves, Config), which honours -savedatafolder. The server uses the same default.
         _dir = !string.IsNullOrWhiteSpace(custom) && Path.IsPathRooted(custom)
             ? Path.GetFullPath(custom)
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RimWorldAgentTranslation", "bridge");
+            : Path.Combine(GameApi.SaveDataFolder(), "AgentTranslation", "bridge");
         _inbox = Path.Combine(_dir, "inbox");
         _outbox = Path.Combine(_dir, "outbox");
     }

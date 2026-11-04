@@ -15,7 +15,7 @@ namespace AgentTranslation.Bridge;
 /// KeyedReplacement.key/value/fileSource/fileSourceFullPath/isPlaceholder, DefInjectionPackage.defType/injections/loadErrors,
 /// DefInjection.injection/injected/fileSource, GenDefDatabase.GetDefSilentFail, LoadedModManager.RunningModsListForReading,
 /// ModContentPack.PackageId/RootDir, VersionControl.CurrentVersionStringWithRev, Current.ProgramState,
-/// LongEventHandler.ExecuteWhenFinished.
+/// LongEventHandler.ExecuteWhenFinished, GenFilePaths.SaveDataFolderPath (cached by the game before mods load).
 /// Callers must be on the main thread. Any failure disables the feature instead of guessing another member.
 /// </summary>
 internal static class GameApi
@@ -114,6 +114,9 @@ internal static class GameApi
         }
         return null;
     }
+
+    /// <summary>The game's data folder (GenFilePaths.SaveDataFolderPath: holds Saves and Config; honours -savedatafolder).</summary>
+    public static string SaveDataFolder() => GenFilePaths.SaveDataFolderPath;
 
     /// <summary>Current value of a plain string field on a Def (paths of the form defName.field only), or null.</summary>
     public static string? DefStringField(Type defType, string defName, string field)

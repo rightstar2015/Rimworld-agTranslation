@@ -145,6 +145,7 @@ public sealed partial class TranslationService : IDisposable
                     load_order = pack?.LoadOrder,
                 },
                 bridge = BridgeStatus(),
+                data_folders = DataFoldersStatus(),
                 load_order = _env.ActiveMods.Select(m => new { order = m.LoadOrder, package_id = m.About.PackageIdRaw, name = m.About.Name }).ToList(),
             };
         }
@@ -246,6 +247,24 @@ public sealed partial class TranslationService : IDisposable
                 notes = scan.Notes.GroupBy(n => n.Code).Select(g => new { code = g.Key, count = g.Count(), examples = g.Take(3).Select(n => n.Detail + (n.File == null ? "" : " @ " + n.File)).ToList() }).ToList(),
             };
         }
+    }
+
+    private object DataFoldersStatus()
+    {
+        var package = DataLocations.PackageName();
+        // Observed: processes started by the Claude desktop app get AppData redirection without a package identity
+        // (GetCurrentPackageFullName returns APPMODEL_ERROR_NO_PACKAGE), so the warning depends on the location only.
+        var redirectable = DataLocations.IsRedirectable(_config.WorkDir) || DataLocations.IsRedirectable(DataLocations.BridgeDir);
+        return new
+        {
+            work_dir = _config.WorkDir,
+            bridge_dir = DataLocations.BridgeDir,
+            migrated_from_legacy = _config.MigratedFromLegacy ? DataLocations.LegacyWorkDir : null,
+            packaged_app = package,
+            warning = redirectable
+                ? "A data folder is under AppData\\Local or AppData\\Roaming. When this server is started by a packaged app (e.g. the Claude desktop app), folders it creates there are redirected to the app's private storage: the user will not find them in Explorer and the game will not see the bridge channel. Ask the user to unset RWAT_WORK_DIR / RWAT_BRIDGE_DIR or point them elsewhere."
+                : null,
+        };
     }
 
     /// <summary>

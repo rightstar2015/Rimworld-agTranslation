@@ -159,6 +159,43 @@ public class TargetLanguageAutoTests
     public void NewConfigsFollowTheGame() => Assert.Equal(TargetLanguages.Auto, new AppConfig().TargetLanguageSetting);
 }
 
+public class DataLocationTests
+{
+    [Fact]
+    public void MigratesTheLegacyFolderOnceWithoutTheBridgeChannel()
+    {
+        var root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rwat-migrate-" + System.Guid.NewGuid().ToString("N"));
+        var legacy = System.IO.Path.Combine(root, "old");
+        var work = System.IO.Path.Combine(root, "new");
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(legacy, "translations", "ChineseSimplified"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(legacy, "bridge", "outbox"));
+        System.IO.File.WriteAllText(System.IO.Path.Combine(legacy, "config.json"), "{}");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(legacy, "translations", "ChineseSimplified", "a.b.json"), "{}");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(legacy, "bridge", "outbox", "runtime.json"), "{}");
+        try
+        {
+            Assert.True(DataLocations.MigrateLegacy(work, legacy));
+            Assert.True(System.IO.File.Exists(System.IO.Path.Combine(work, "translations", "ChineseSimplified", "a.b.json")));
+            Assert.False(System.IO.Directory.Exists(System.IO.Path.Combine(work, "bridge")));
+            Assert.True(System.IO.File.Exists(System.IO.Path.Combine(legacy, "MOVED.txt")));
+            Assert.True(System.IO.File.Exists(System.IO.Path.Combine(legacy, "config.json")));
+            Assert.False(DataLocations.MigrateLegacy(work, legacy));
+        }
+        finally
+        {
+            System.IO.Directory.Delete(root, true);
+        }
+    }
+
+    [Fact]
+    public void DefaultsLiveInTheGameDataFolder()
+    {
+        Assert.EndsWith(System.IO.Path.Combine("RimWorld by Ludeon Studios", "AgentTranslation"), DataLocations.DefaultWorkDir);
+        Assert.False(DataLocations.IsRedirectable(DataLocations.DefaultWorkDir));
+        Assert.True(DataLocations.IsRedirectable(DataLocations.LegacyWorkDir));
+    }
+}
+
 public class CodeKeyValidationTests
 {
     private static readonly ValidatorOptions Sc = new ValidatorOptions { Script = TargetScript.Simplified };

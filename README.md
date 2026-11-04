@@ -44,7 +44,7 @@ Tools: `get_environment`, `list_mods`, `scan_mod`, `get_batch`, `submit_translat
 
 ## Optional in-game bridge
 
-`Agent Translation Bridge` is a small companion mod. After the game loads it checks which pack translations are actually in effect (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed texts without restarting (experimental, off by default). It only uses `%LOCALAPPDATA%\RimWorldAgentTranslation\bridge` and opens no network port.
+`Agent Translation Bridge` is a small companion mod. After the game loads it checks which pack translations are actually in effect (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed texts without restarting (experimental, off by default). It only uses the `AgentTranslation\bridge` folder inside RimWorld's data folder (next to `Saves` and `Config`) and opens no network port.
 
 ```bash
 dotnet build src/AgentTranslation.Bridge -p:RimWorldDir="C:\path\to\RimWorld"
@@ -74,7 +74,7 @@ rwat build
 
 ## Configuration
 
-`%LOCALAPPDATA%\RimWorldAgentTranslation\config.json` (move the work folder with `RWAT_WORK_DIR`). Main settings:
+`%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\AgentTranslation\config.json`, inside RimWorld's data folder next to `Saves` and `Config` (move the work folder with `RWAT_WORK_DIR`). Older versions used `%LOCALAPPDATA%\RimWorldAgentTranslation`; its content is copied over on first start. The game must have been started once so that its data folder exists. Main settings:
 
 | Setting | Default | Meaning |
 |---|---|---|

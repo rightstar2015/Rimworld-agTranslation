@@ -57,7 +57,7 @@ public static class TargetLanguages
 
 /// <summary>
 /// Settings file: &lt;work folder&gt;/config.json. Paths and names only, never any secret.
-/// The work folder defaults to %LOCALAPPDATA%\RimWorldAgentTranslation and can be overridden with RWAT_WORK_DIR.
+/// The work folder defaults to <RimWorld data folder>\AgentTranslation (see DataLocations) and can be overridden with RWAT_WORK_DIR.
 /// </summary>
 public sealed class AppConfig
 {
@@ -139,6 +139,10 @@ public sealed class AppConfig
     [JsonIgnore]
     public string WorkDir { get; private set; } = string.Empty;
 
+    /// <summary>True when this start copied the pre-stage-5 work folder into the new location.</summary>
+    [JsonIgnore]
+    public bool MigratedFromLegacy { get; private set; }
+
     [JsonIgnore]
     public string PackDir => Path.Combine(PackOutputRoot, PackFolderName);
 
@@ -166,9 +170,17 @@ public sealed class AppConfig
     public static AppConfig Load()
     {
         var workDir = Environment.GetEnvironmentVariable("RWAT_WORK_DIR");
+        var migrated = false;
         if (string.IsNullOrWhiteSpace(workDir))
         {
-            workDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RimWorldAgentTranslation");
+            // Never create the game's data folder ourselves: inside a packaged app it would be redirected to private
+            // storage and the game would not see it. The game creates it on its first start.
+            if (!Directory.Exists(DataLocations.GameDataDir))
+            {
+                throw new InvalidOperationException("RimWorld's data folder was not found (" + DataLocations.GameDataDir + "). Start the game once, or set RWAT_WORK_DIR.");
+            }
+            workDir = DataLocations.DefaultWorkDir;
+            migrated = DataLocations.MigrateLegacy(workDir);
         }
         workDir = Path.GetFullPath(workDir);
         Directory.CreateDirectory(workDir);
@@ -177,6 +189,7 @@ public sealed class AppConfig
         var existingText = File.Exists(path) ? File.ReadAllText(path) : null;
         config = existingText != null ? JsonSerializer.Deserialize<AppConfig>(existingText, Json) ?? new AppConfig() : new AppConfig();
         config.WorkDir = workDir;
+        config.MigratedFromLegacy = migrated;
 
         var envGame = Environment.GetEnvironmentVariable("RWAT_GAME_DIR");
         if (!string.IsNullOrWhiteSpace(envGame))

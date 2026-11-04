@@ -33,7 +33,8 @@ public sealed class RuntimeReport
 
 /// <summary>
 /// File channel to the in-game bridge mod. The location is fixed so the game finds it without any setting:
-/// %LOCALAPPDATA%\RimWorldAgentTranslation\bridge, or RWAT_BRIDGE_DIR when set (for tests; the game must see the same value).
+/// &lt;RimWorld data folder&gt;\AgentTranslation\bridge (see <see cref="DataLocations"/>), or RWAT_BRIDGE_DIR when set
+/// (for tests; the game must see the same value).
 /// The server only writes fixed-format requests into inbox/ and only reads outbox/runtime.json.
 /// </summary>
 public sealed class BridgeChannel
@@ -44,10 +45,7 @@ public sealed class BridgeChannel
 
     public BridgeChannel()
     {
-        var custom = Environment.GetEnvironmentVariable("RWAT_BRIDGE_DIR");
-        _dir = !string.IsNullOrWhiteSpace(custom) && Path.IsPathRooted(custom)
-            ? Path.GetFullPath(custom)
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RimWorldAgentTranslation", "bridge");
+        _dir = DataLocations.BridgeDir;
     }
 
     public string Directory => _dir;
