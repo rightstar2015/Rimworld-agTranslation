@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    In-game bridge mod for RimWorld 1.7 (Waylith, CoreCLR .NET 10).
+    Compiles against the game's own Assembly-CSharp.dll and UnityStubs.dll, which are referenced but never copied
+    or distributed. Set the game folder with -p:RimWorldDir=... or the RWAT_GAME_DIR environment variable.
+    No Harmony and no NuGet packages.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>AgentTranslation.Bridge</AssemblyName>
+    <RootNamespace>AgentTranslation.Bridge</RootNamespace>
+    <RimWorldDir Condition="'$(RimWorldDir)' == ''">$(RWAT_GAME_DIR)</RimWorldDir>
+    <ModFolderName>!AgentTranslation_Bridge</ModFolderName>
+    <ModOutputDir>$(MSBuildThisFileDirectory)..\..\artifacts\bridge-mod\$(ModFolderName)\</ModOutputDir>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+  </PropertyGroup>
+
+  <Target Name="CheckRimWorldDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(RimWorldDir)' == '' Or !Exists('$(RimWorldDir)\Assembly-CSharp.dll')"
+           Text="RimWorld folder not found. Build with -p:RimWorldDir=&lt;game folder&gt; or set RWAT_GAME_DIR." />
+  </Target>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(RimWorldDir)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityStubs">
+      <HintPath>$(RimWorldDir)\UnityStubs.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Mod\**\*" />
+  </ItemGroup>
+
+  <!-- Assemble the mod folder: About, Languages and 1.7/Assemblies/AgentTranslation.Bridge.dll. -->
+  <Target Name="AssembleMod" AfterTargets="Build">
+    <ItemGroup>
+      <ModContent Include="Mod\**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(ModOutputDir)" />
+    <Copy SourceFiles="@(ModContent)" DestinationFiles="@(ModContent->'$(ModOutputDir)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ModOutputDir)1.7\Assemblies\" />
+  </Target>
+</Project>

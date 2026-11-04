@@ -111,4 +111,12 @@ public sealed class McpTools
         [Description("Mod packageId.")] string mod_id,
         [Description("true to write; preview by default.")] bool apply = false)
         => Run(() => _svc.AdoptSimplified(mod_id, apply));
+
+    [McpServerTool(Name = "request_reload", Title = "Request an in-game reload (experimental)", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [Description("Experimental. Asks the in-game bridge mod to reload the pack's Keyed texts (UI strings) without restarting. Run build_pack first." +
+        " Works only when the user has the bridge mod active and turned on \"allow reloading Keyed\" in its mod settings; otherwise the game refuses it." +
+        " Def names and descriptions are not reloaded and still need a restart. Only writes a fixed-format request; the result appears later in get_environment bridge.report.last_request.")]
+    public object RequestReload(
+        [Description("Only \"keyed\" is supported.")] string scope = "keyed")
+        => Run(() => _svc.RequestReload(scope));
 }

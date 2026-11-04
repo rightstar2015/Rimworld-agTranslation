@@ -33,6 +33,11 @@ public static class Program
           rwat glossary-add <s2t|en> <SOURCE> <TARGET> [--note NOTE] [--language L]
                                            Add a term (origin user; agents cannot change it)
           rwat glossary-remove <s2t|en> <SOURCE> [--language L]
+        In-game bridge (stage 3):
+          rwat install-bridge [--from DIR] Install the bridge mod into the Mods folder (only its own folder)
+          rwat bridge-status               Bridge status and the latest runtime report summary
+          rwat bridge-refresh              Ask the bridge for a fresh runtime report
+          rwat reload                      Ask the bridge to reload Keyed texts (experimental, must be enabled in game)
         Reports for the user (Markdown, Traditional Chinese):
           rwat s2t-report [--count N] [--max-mods N] [--out FILE]
                                            Spot-check of Simplified -> Traditional conversion
@@ -41,7 +46,8 @@ public static class Program
           rwat coverage [--out FILE]       Missing entries of every active mod for the target language
 
         Environment: RWAT_WORK_DIR (work folder), RWAT_GAME_DIR (game folder), RWAT_PACK_OUTPUT_DIR (pack parent folder),
-                     RWAT_TARGET_LANGUAGE (ChineseSimplified or ChineseTraditional; overrides config.json)
+                     RWAT_TARGET_LANGUAGE (ChineseSimplified or ChineseTraditional; overrides config.json),
+                     RWAT_BRIDGE_DIR (bridge inbox/outbox; the game must see the same value)
         """;
 
     public static async Task<int> Main(string[] args)
@@ -100,6 +106,10 @@ public static class Program
                 "glossary" => svc.GlossaryGet(args.Length > 1 && args[1] is "s2t" or "en" ? args[1] : null, Opt(args, "--query")),
                 "glossary-add" => svc.GlossaryAdd(Arg(args, 1), Arg(args, 2), Arg(args, 3), Opt(args, "--note"), "user", Opt(args, "--language")),
                 "glossary-remove" => svc.GlossaryRemove(Arg(args, 1), Arg(args, 2), Opt(args, "--language")),
+                "install-bridge" => svc.InstallBridge(Opt(args, "--from")),
+                "bridge-status" => ((System.Text.Json.JsonElement)JsonSerializer.SerializeToElement(svc.GetEnvironment(), AppConfig.Json)).GetProperty("bridge"),
+                "bridge-refresh" => svc.RequestBridgeReport(),
+                "reload" => svc.RequestReload("keyed"),
                 _ => throw new ArgumentException("Unknown command: " + cmd + "\n\n" + Usage),
             };
             var json = JsonSerializer.Serialize(result, AppConfig.Json);

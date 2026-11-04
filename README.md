@@ -32,7 +32,19 @@ The server speaks MCP over stdio: `rwat serve`. Example for Claude Code:
 claude mcp add rimworld-translation -- "C:\path\to\rwat.exe" serve
 ```
 
-Tools: `get_environment`, `list_mods`, `scan_mod`, `get_batch`, `submit_translations`, `validate_pack`, `build_pack`, `query_memory`, `glossary_get`, `glossary_add`, `adopt_simplified`. None of them runs commands, reads arbitrary files or accesses the network.
+Tools: `get_environment`, `list_mods`, `scan_mod`, `get_batch`, `submit_translations`, `validate_pack`, `build_pack`, `query_memory`, `glossary_get`, `glossary_add`, `adopt_simplified`, `request_reload`. None of them runs commands, reads arbitrary files or accesses the network.
+
+## Optional in-game bridge
+
+`Agent Translation Bridge` is a small companion mod. After the game loads it checks which pack translations are actually in effect (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed texts without restarting (experimental, off by default). It only uses `%LOCALAPPDATA%\RimWorldAgentTranslation\bridge` and opens no network port.
+
+```bash
+dotnet build src/AgentTranslation.Bridge -p:RimWorldDir="C:\path\to\RimWorld"
+```
+
+```bash
+rwat install-bridge --from artifacts/bridge-mod/!AgentTranslation_Bridge
+```
 
 ## Offline mode
 

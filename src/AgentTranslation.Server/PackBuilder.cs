@@ -251,7 +251,7 @@ public sealed class PackBuilder
         };
     }
 
-    public object Validate(string? onlyId)
+    public object Validate(string? onlyId, object? runtimeCheck = null)
     {
         var plan = Plan(onlyId == null ? null : new[] { onlyId });
         var flaggedEntries = new List<object>();
@@ -317,6 +317,7 @@ public sealed class PackBuilder
             skipped = plan.Skipped.Select(s => new { package_id = s.PackageId, id = s.Record.Id, path = s.Record.Path, reason = s.Reason }).ToList(),
             pack_built = File.Exists(manifestPath),
             pack_problems = packProblems,
+            runtime_check = runtimeCheck,
         };
     }
 

@@ -1,6 +1,6 @@
 # 階段 3：遊戲內橋接模組（設計，待確認）
 
-> 狀態：設計與量測完成，**尚未寫程式**。第 7 節有 4 個決定需要你確認。
+> 狀態：第 7 節的決定已確認（全部照建議），A／B／C1／D 已實作，等待遊戲內驗收（第 8 節）。
 > 依據：反編譯 1.7.4998 的 Assembly-CSharp（ilspycmd）、本機 Waylith 的 `RimWorld.runtimeconfig.json`、你的 `Player.log`（2026-11-04 15:22 那次啟動）。
 
 ## 1. 對照實際環境確認的事實
@@ -94,3 +94,28 @@ C1 由設定頁的按鈕或 MCP 的 `request_reload(scope="keyed")` 觸發；設
 2. **重載範圍**：建議 C1（只重載 Keyed，預設關閉）。
 3. **執行期驗證結果放在既有工具**（`get_environment`、`validate_pack`，建議）還是新增一個 `get_runtime_report` 工具？前者不增加工具數量；後者回傳內容較集中。
 4. **參考專案模組的處理**：建議只偵測並在報告與設定頁列出「哪些條目被它覆蓋」，不做任何干預。
+
+## 8. 實作內容（2026-11-04）
+
+| 部分 | 檔案 | 說明 |
+|---|---|---|
+| 橋接模組 | `src/AgentTranslation.Bridge/` | net10.0；只參考遊戲的 `Assembly-CSharp.dll`、`UnityStubs.dll`（不複製）；不用 Harmony、沒有套件相依。輸出到 `artifacts/bridge-mod/!AgentTranslation_Bridge` |
+| 遊戲 API 隔離 | `GameApi.cs` | 所有遊戲型別只在這個檔案出現，且只用 public 成員（清單寫在檔案開頭） |
+| 收件匣格式 | `InboxRequest.cs` | 伺服器與橋接共用同一份程式；只有 `schema`、`kind`、`request_id` 三個欄位，多一個欄位就拒絕 |
+| 翻譯包讀取 | `PackReader.cs` | 只讀 manifest 列出、且位於翻譯包資料夾內的檔案；禁止 DTD |
+| 伺服器 | `BridgeChannel.cs`、`TranslationService.Bridge.cs` | `get_environment.bridge`、`validate_pack.runtime_check`、MCP 工具 `request_reload(scope="keyed")` |
+| CLI | `rwat install-bridge`、`bridge-status`、`bridge-refresh`、`reload` | 安裝橋接只能用 CLI：它是會執行程式碼的模組，不讓 Agent 觸發 |
+
+報告產生時機：主選單停留 10 秒後一次、進入遊戲 10 秒後一次、收到請求或按設定頁按鈕時。逐條比對在主執行緒分批進行（每批 200 筆，每幀最多 2 毫秒），讀寫檔案都在背景執行緒。
+
+偏離原設計的一點：`GameApi` 直接引用遊戲型別編譯，而不是全部用反射。理由是只用 public 成員、型別檢查能在編譯時發現錯誤；所有呼叫仍集中在 `GameApi.cs` 一個檔案。
+
+測試：新增 22 個（收件匣格式 15 個、翻譯包讀取 4 個、伺服器通道 2 個，以及路徑逃逸與 DTD）。全部 99 個測試通過。
+
+## 9. 遊戲內驗收步驟
+
+1. 在模組清單啟用「Agent Translation Bridge」（位置不限），重新啟動遊戲。
+2. 在主選單停留至少 10 秒。
+3. 打開「選項 → 模組設定 → Agent Translation」，畫面應顯示上次報告時間與各項數字（82 筆、已生效數等）。
+4. 告訴我，我會讀取報告與日誌（`[AgentTranslation.Bridge]` 開頭的訊息），確認逐條驗證結果。
+5. （可選，實驗性重載）在同一頁勾選「允許不重啟遊戲重新載入 Keyed 譯文」。之後我改一筆 Keyed 譯文並重建翻譯包，送出重載請求，你在不重開遊戲的情況下確認文字是否改變。

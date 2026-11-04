@@ -11,11 +11,13 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
-    <!-- OpenCC 1.4.2 字典（Apache-2.0），見 Data/opencc/NOTICE.md -->
+    <!-- OpenCC 1.4.2 dictionaries (Apache-2.0), see Data/opencc/NOTICE.md -->
     <EmbeddedResource Include="Data\opencc\*.txt" LogicalName="opencc/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AgentTranslation.Core\AgentTranslation.Core.csproj" />
+    <!-- Shared with the bridge mod so both sides use the same request format. No game dependency. -->
+    <Compile Include="..\AgentTranslation.Bridge\InboxRequest.cs" Link="Bridge\InboxRequest.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol" Version="[2.3.1]" />

@@ -38,4 +38,10 @@ dotnet build src/AgentTranslation.Server
 dotnet test tests/AgentTranslation.Tests
 ```
 
+The in-game bridge mod is not in the solution because it needs the game's assemblies:
+
+```bash
+dotnet build src/AgentTranslation.Bridge -p:RimWorldDir="F:\SteamLibrary\steamapps\common\RimWorld"
+```
+
 Use a scratch `RWAT_WORK_DIR` (and `RWAT_PACK_OUTPUT_DIR` when building) for tests so the user's real work folder and game `Mods` folder are not touched.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <packageId>agenttranslation.bridge</packageId>
+  <name>Agent Translation Bridge</name>
+  <author>RimWorld Agent Translation</author>
+  <supportedVersions>
+    <li>1.7</li>
+  </supportedVersions>
+  <description>Optional companion of the Agent Translation pack (rwat).
+
+Reports which pack translations are actually in effect in the game (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed translations without restarting (experimental, off by default).
+
+Reads and writes only its own folder under %LOCALAPPDATA%\RimWorldAgentTranslation\bridge. Opens no network port. Never changes other mods.</description>
+</ModMetaData>

@@ -121,7 +121,7 @@ public sealed partial class TranslationService : IDisposable
                     active = pack?.Active ?? false,
                     load_order = pack?.LoadOrder,
                 },
-                bridge = new { status = "not_available", note = "The in-game bridge mod arrives in stage 3." },
+                bridge = BridgeStatus(),
                 load_order = _env.ActiveMods.Select(m => new { order = m.LoadOrder, package_id = m.About.PackageIdRaw, name = m.About.Name }).ToList(),
             };
         }
@@ -426,7 +426,8 @@ public sealed partial class TranslationService : IDisposable
     {
         lock (_lock)
         {
-            return new PackBuilder(_config, _env, _scanner, _store, ValidatorOptionsFor()).Validate(modId == null ? null : RequireMod(modId).PackageId);
+            var pkg = modId == null ? null : RequireMod(modId).PackageId;
+            return new PackBuilder(_config, _env, _scanner, _store, ValidatorOptionsFor()).Validate(pkg, RuntimeCheck(pkg));
         }
     }
 
