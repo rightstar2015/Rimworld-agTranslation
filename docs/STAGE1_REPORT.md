@@ -48,21 +48,28 @@
 1. **XML 空白節點蓋掉繼承內容**：讀檔時保留了純空白文字節點，合併繼承時被當成「子節點有文字」而清空父節點內容，導致 ThingDef 全部漏抽。改為與遊戲相同的「不保留純空白」，並加防護。
 2. **暫定簡體字清單誤收繁簡同形字**（修、械、器、存、源…）：第一次匯入有 19 筆被誤拒。已刪除這些字並加回歸測試。這份清單是暫時的，階段 2 會換成 OpenCC 字典產生的集合。
 
-## 5. 需要你做的遊戲內驗收
+## 5. 遊戲內驗收（2026-11-04 完成）
 
-1. 遊戲語言切換為「繁體中文」（目前是簡體中文）。
-2. 在模組清單啟用「Agent Translation Pack (繁體中文)」，放在兩個被翻譯模組之後（About.xml 已寫 loadAfter，自動排序會處理）。
-3. 重啟遊戲，確認：
-   - 模組設定頁（Outfit Stands Plus、Prisoners Should Fear Turrets）顯示中文；
-   - 研究「機械化服裝架」「修補服裝架」、建築「修補服裝架」等名稱與描述為中文；
-   - 開發者模式的日誌沒有與這兩個模組或翻譯包相關的紅字。
-4. 告訴我結果後，我會讀 `Logs/Player.log` 比對與翻譯相關的錯誤（例如 "Duplicate def-injected"、"Couldn't inject"、"Translation data for language … has N errors"）。
+原定以繁中測試；因預設目標語言已改為簡體（`docs/LANGUAGE_MODE_PLAN.md`），改在你平常的簡中環境測試。
+
+| 項目 | 內容 |
+|---|---|
+| 環境 | 1.7.4998 rev1299（Waylith），401 個啟用模組，遊戲語言 ChineseSimplified (简体中文)，讀取存檔測試 |
+| 翻譯包 | `!AgentTranslation_Pack`，簡中 82 筆：MigCorp - Skiptech 69 筆（Keyed 設定、研究、研究分頁、建築、物品、Hediff、Job）＋ FemaleBB BodyType Support 13 筆（Keyed 設定、基因）。提交時 0 筆被拒、0 筆可疑 |
+| 載入順序 | 翻譯包第 399 位，在兩個被翻譯模組（第 76、118 位）之後 |
+| 你的畫面確認 | 模組設定「MigCorp - 跳跃科技」「BB 体型支持」及選項、研究分頁「米格公司研究」、建築「米格公司跳跃门」皆顯示中文 |
+| 日誌：翻譯錯誤數 | 「Translation data for language Simplified Chinese has 1314 errors」，與測試前基準相同（翻譯包未新增任何翻譯錯誤） |
+| 日誌：其他錯誤 | 217 行，無任何一筆與翻譯包或兩個被翻譯模組有關；主要是其他模組的遊戲中錯誤（FAOC_VaultDeliverResources 約 190 筆、TowersBetterResearchTabs 與異象研究提醒不相容 1 筆） |
+
+結論：階段 1 的端到端流程（掃描 → 批次 → 提交與驗證 → 建置 → 遊戲載入）在實際環境中通過。
+
+尚未在遊戲內驗證：繁體模式的翻譯包（早期的繁中測試包已被這次的簡中包取代）、自動採用寫入的條目。
 
 ## 6. 已知限制（留待後續階段）
 
 | 限制 | 計畫 |
 |---|---|
-| 掃描一個模組約 20 秒（需讀取 400 個模組的既有繁中翻譯與官方 Defs） | 階段 2：檔案指紋快取 |
+| 掃描一個模組約 20 秒（需讀取 400 個模組的既有繁中翻譯與官方 Defs） | 階段 2 已加入檔案指紋快取 |
 | 簡體字偵測只是暫定清單 | 階段 2：OpenCC 字典（Apache-2.0，附 NOTICE） |
 | 沒有翻譯記憶與術語表；`memory` 欄位為空 | 階段 2 |
 | 不處理 Strings、RulePack、SlateRef、英文 DefInjected 覆蓋、Patches 新增的文字 | 階段 2 評估 |
