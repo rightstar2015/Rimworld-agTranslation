@@ -30,6 +30,8 @@
 | 標記語法 | `ColoredText.TagRegex = \([\*\/][^\)]*\)`（例如 `(*Threat)`）、`XMLRegex = <[^>]*>` | 驗證器加入 `(*Tag)` 類標記 |
 | 設定檔位置 | 與官方版相同（LocalLow），`Logs/Player.log` 為遊戲日誌 | 環境資訊不需要橋接器即可取得 |
 
+> 更正（2026-11-04）：再次對照組件，單一欄位重複時雖會記錄訊息，但仍以 `SetOrAdd` 後者覆蓋，且這則訊息在注入階段開頭被 `loadErrors.Clear()` 清掉、不計入警告；只有整串清單重複會丟例外並讓該檔後續條目失效。詳見 `docs/LANGUAGE_MODE_PLAN.md` 第 1 節。結論不變：已有翻譯的條目仍一律不輸出。
+
 仍未確認：大括號 token 的完整語法、`Def` 節點本身帶 `Class` 屬性時歸屬哪個 DefDatabase、同 defName 重複定義時的取用規則、Patches 對文字與清單索引的影響。程式碼註解皆已標記。
 
 ## 3. 測試模組結果
