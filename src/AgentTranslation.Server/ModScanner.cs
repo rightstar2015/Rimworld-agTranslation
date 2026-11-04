@@ -82,6 +82,18 @@ public sealed class ModScanner : IDisposable
             }
             ScanCache.Save(_config.WorkDir, mod.PackageId, fingerprint, extracted);
         }
+        if (_config.CodeKeys.Enabled)
+        {
+            var codeKeys = CodeKeyEntries(mod, extracted);
+            if (codeKeys.Count > 0)
+            {
+                var combined = new ExtractionResult();
+                combined.Entries.AddRange(extracted.Entries);
+                combined.Entries.AddRange(codeKeys);
+                combined.Notes.AddRange(extracted.Notes);
+                extracted = combined;
+            }
+        }
         var scan = Classify(mod, extracted);
         _cache[mod.PackageId] = scan;
         return scan;
@@ -163,6 +175,71 @@ public sealed class ModScanner : IDisposable
         final.Entries.AddRange(entries);
         final.Notes.AddRange(result.Notes);
         return final;
+    }
+
+    private Dictionary<string, string>? _englishKeys;
+
+    /// <summary>Every Keyed key defined in English by an active mod or the official data, with its text.</summary>
+    public Dictionary<string, string> EnglishKeys()
+    {
+        if (_englishKeys != null)
+        {
+            return _englishKeys;
+        }
+        var keys = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var m in _env.ActiveMods)
+        {
+            foreach (var (_, full) in LoadFolderResolver.CollectFiles(m.RootDir, _env.LoadFoldersFor(m), Path.Combine("Languages", "English", "Keyed")))
+            {
+                try
+                {
+                    foreach (var el in SafeXml.LoadFile(full).Root?.Elements() ?? Enumerable.Empty<XElement>())
+                    {
+                        keys.TryAdd(el.Name.LocalName, el.Value);
+                    }
+                }
+                catch (Exception)
+                {
+                    // Broken files are reported by the mod's own scan.
+                }
+            }
+        }
+        _englishKeys = keys;
+        return keys;
+    }
+
+    /// <summary>Assemblies the game loads for this mod (current version folders only).</summary>
+    public List<string> AssembliesOf(InstalledMod mod) =>
+        LoadFolderResolver.CollectFiles(mod.RootDir, _env.LoadFoldersFor(mod), "Assemblies", "*.dll").Select(x => x.Item2).ToList();
+
+    /// <summary>
+    /// Keys the mod's code passes to Translate() that no active mod defines in English (stage 4, opt-in). The game shows
+    /// such a key as raw text. Entries have an empty source and carry where the key is used.
+    /// </summary>
+    private List<SourceEntry> CodeKeyEntries(InstalledMod mod, ExtractionResult extracted)
+    {
+        var english = EnglishKeys();
+        var own = new HashSet<string>(extracted.Entries.Where(e => e.Kind == EntryKind.Keyed).Select(e => e.InjectionPath), StringComparer.Ordinal);
+        var found = CodeStringScanner.Scan(AssembliesOf(mod));
+        var result = new List<SourceEntry>();
+        foreach (var g in found.Keys.GroupBy(k => k.Key, StringComparer.Ordinal).OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            if (english.ContainsKey(g.Key) || own.Contains(g.Key))
+            {
+                continue;
+            }
+            var first = g.First();
+            // An unknown argument count wins over a known one: the key may be used with arguments somewhere.
+            var args = g.Any(k => k.ArgCount == null) ? null : g.Max(k => k.ArgCount);
+            var nearby = g.SelectMany(k => k.NearbyKeys).Distinct(StringComparer.Ordinal).Take(8)
+                .Select(k => new KeyValuePair<string, string>(k, english.TryGetValue(k, out var v) ? (v.Length > 120 ? v.Substring(0, 120) : v) : string.Empty))
+                .ToList();
+            result.Add(new SourceEntry(mod.PackageId, EntryKind.Keyed, null, g.Key, string.Empty, "code:" + first.Assembly)
+            {
+                Code = new CodeKeyContext(first.Assembly, first.Type, first.Method, args, nearby),
+            });
+        }
+        return result;
     }
 
     /// <summary>Marks entries already translated, or touched with a possibly different path form, by the target-language translations of all active mods.</summary>

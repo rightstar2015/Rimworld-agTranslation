@@ -154,6 +154,51 @@ public static class LanguageReports
         return sb.ToString();
     }
 
+    /// <summary>Stage 4: keys used in code that no language file defines, and English hardcoded in UI calls (report only).</summary>
+    public static string CodeStrings(TranslationService svc)
+    {
+        var rows = new List<(InstalledMod Mod, List<CodeKeyRef> Keys, List<CodeLiteral> Literals)>();
+        foreach (var mod in TranslatableMods(svc))
+        {
+            var (keys, literals) = svc.CodeStringsOf(mod);
+            if (keys.Count + literals.Count > 0)
+            {
+                rows.Add((mod, keys, literals));
+            }
+        }
+        var sb = new StringBuilder();
+        sb.Append("# 程式碼中的字串\n\n");
+        sb.Append("> 產生時間：").Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm")).Append("。遊戲 ").Append(svc.Env.VersionFull)
+          .Append("。目標語言 **").Append(svc.Config.TargetLanguage).Append("**。範圍：啟用中的非官方模組。只讀取 DLL 檔案內容，不載入、不執行模組程式碼。\n\n");
+        sb.Append("## 摘要\n\n| 類型 | 模組數 | 數量 | 處理方式 |\n|---|---|---|---|\n");
+        sb.Append("| A. 程式碼有用、英文與目標語言都沒定義的鍵（遊戲顯示鍵名） | ").Append(rows.Count(r => r.Keys.Count > 0)).Append(" | ").Append(rows.Sum(r => r.Keys.Count))
+          .Append(" | ").Append(svc.Config.CodeKeys.Enabled ? "已啟用：會出現在 get_batch，由 Agent 推測譯文" : "未啟用（config.json 的 `code_keys.enabled`）").Append(" |\n");
+        sb.Append("| B. 直接寫在介面呼叫裡的英文（啟發式判斷） | ").Append(rows.Count(r => r.Literals.Count > 0)).Append(" | ").Append(rows.Sum(r => r.Literals.Count))
+          .Append(" | 只回報；無法用語言檔翻譯，可轉告模組作者 |\n\n");
+        sb.Append("限制：只找得到「字串常數直接傳給呼叫」的情況，用字串拼接或變數產生的鍵與文字找不到。B 類已排除 `DEV`／`Debug` 開頭的開發者字串與看起來像識別碼的字串，仍可能有誤判。\n\n");
+        sb.Append("## A. 缺少定義的鍵（最多 40 個模組）\n\n| 模組 | 數量 | 例子（用在哪裡） |\n|---|---|---|\n");
+        foreach (var r in rows.Where(r => r.Keys.Count > 0).OrderByDescending(r => r.Keys.Count).Take(40))
+        {
+            sb.Append("| ").Append(Esc(r.Mod.About.Name)).Append(" | ").Append(r.Keys.Count).Append(" | ")
+              .Append(string.Join("<br>", r.Keys.Take(4).Select(k => Quote(k.Key) + "（" + Esc(ShortType(k.Type)) + "." + Esc(k.Method) + "）")))
+              .Append(" |\n");
+        }
+        sb.Append("\n## B. 寫死的英文（最多 40 個模組）\n\n| 模組 | 數量 | 例子 |\n|---|---|---|\n");
+        foreach (var r in rows.Where(r => r.Literals.Count > 0).OrderByDescending(r => r.Literals.Count).Take(40))
+        {
+            sb.Append("| ").Append(Esc(r.Mod.About.Name)).Append(" | ").Append(r.Literals.Count).Append(" | ")
+              .Append(string.Join("<br>", r.Literals.Take(4).Select(l => Quote(l.Text.Length > 60 ? l.Text.Substring(0, 60) + "…" : l.Text))))
+              .Append(" |\n");
+        }
+        return sb.ToString();
+    }
+
+    private static string ShortType(string type)
+    {
+        var i = type.LastIndexOf('.');
+        return i >= 0 ? type.Substring(i + 1) : type;
+    }
+
     private static string Quote(string s) => "`" + s.Replace("`", "'").Replace("\n", "\\n") + "`";
     private static string Esc(string s) => s.Replace("|", "\\|").Replace("\n", " ");
 }

@@ -53,6 +53,7 @@ public sealed class McpTools
     [Description("Gets a batch of entries to translate. " + TranslationService.DataNotice +
         " Each item has id, kind, field_path, source (the text), context (label/description of the owning Def), placeholders (tokens to keep unchanged), newline_count (number of \\n)," +
         " memory (existing translations to reuse for consistency) and terms (glossary and official names found in the source)." +
+        " Items with origin code_key (only when the user enabled code_keys) are keys used in mod code that no language file defines: they have no source, so infer a short text from the key and code_context; see code_key_note." +
         " Translate into the target_language given in the result, follow style, keep every placeholder and \\n, then send the results with submit_translations. Batches are registered on the server and expire after 24 hours.")]
     public object GetBatch(
         [Description("Mod packageId.")] string mod_id,

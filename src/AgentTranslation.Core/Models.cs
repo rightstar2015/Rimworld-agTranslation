@@ -78,6 +78,12 @@ namespace AgentTranslation.Core
         /// </summary>
         public IReadOnlyList<string> DefTypeAliases { get; set; } = Array.Empty<string>();
 
+        /// <summary>
+        /// Set for a Keyed key that mod code passes to Translate() but no language file defines (stage 4, opt-in).
+        /// Such an entry has no English source: Source is empty and the agent infers the text from the key and context.
+        /// </summary>
+        public CodeKeyContext? Code { get; set; }
+
         /// <summary>CanonicalPath under every accepted Def type name (just CanonicalPath for Keyed).</summary>
         public IEnumerable<string> CanonicalPathCandidates
         {
@@ -93,6 +99,27 @@ namespace AgentTranslation.Core
                 }
             }
         }
+    }
+
+    /// <summary>Where mod code uses a key that no language file defines. Context only, not part of the ID.</summary>
+    public sealed class CodeKeyContext
+    {
+        public CodeKeyContext(string assembly, string type, string method, int? argCount, IReadOnlyList<KeyValuePair<string, string>> nearby)
+        {
+            Assembly = assembly;
+            Type = type;
+            Method = method;
+            ArgCount = argCount;
+            Nearby = nearby;
+        }
+
+        public string Assembly { get; }
+        public string Type { get; }
+        public string Method { get; }
+        /// <summary>Format arguments passed with the key; null when unknown.</summary>
+        public int? ArgCount { get; }
+        /// <summary>Other keys used in the same method, with their English text when known.</summary>
+        public IReadOnlyList<KeyValuePair<string, string>> Nearby { get; }
     }
 
     /// <summary>A problem met during extraction that does not affect other entries.</summary>

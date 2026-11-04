@@ -46,6 +46,10 @@ dotnet build src/AgentTranslation.Bridge -p:RimWorldDir="C:\path\to\RimWorld"
 rwat install-bridge --from artifacts/bridge-mod/!AgentTranslation_Bridge
 ```
 
+## Strings in mod code
+
+`rwat code-strings --out report.md` lists, per mod, keys that the code passes to `Translate()` but no language file defines, and English text hardcoded in UI calls. Assemblies are read as files; mod code is never loaded or run. Hardcoded text is only reported, never replaced.
+
 ## Offline mode
 
 ```bash
@@ -69,6 +73,7 @@ rwat build
 | `target_language` | `ChineseSimplified` | `ChineseSimplified` or `ChineseTraditional` |
 | `pack_output_dir` | game `Mods` folder | Where the pack folder is written (`RWAT_PACK_OUTPUT_DIR` overrides) |
 | `simplified_auto_adopt.enabled` | `false` | Lets existing Simplified translations be adopted automatically under the conditions you set |
+| `code_keys.enabled` | `false` | Also offers keys that mod code uses but no language file defines (the game shows the raw key). They have no English source, so the agent infers the text; each one is flagged for review |
 
 Only you edit this file; MCP tools cannot change it.
 

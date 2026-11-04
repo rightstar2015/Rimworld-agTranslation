@@ -30,6 +30,8 @@ public sealed class ManifestEntry
     public string File { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public List<string> Flags { get; set; } = new();
+    /// <summary>"code_key" for a key used in code that has no English source; null otherwise.</summary>
+    public string? Origin { get; set; }
 }
 
 /// <summary>
@@ -68,6 +70,8 @@ public sealed class PackBuilder
     {
         var plan = new Planned();
         var langRoot = _env.Version + "/Languages/" + _config.TargetLanguageFolder + "/";
+        // A key used in the code of two mods (e.g. a shared library copied into both) is written once.
+        var codeKeysWritten = new HashSet<string>(StringComparer.Ordinal);
         foreach (var pkg in _store.AllPackageIds().Distinct().OrderBy(p => p, StringComparer.Ordinal))
         {
             if (onlyIds != null && !onlyIds.Contains(pkg))
@@ -91,7 +95,8 @@ public sealed class PackBuilder
             {
                 if (!scan.ById.TryGetValue(r.Id, out var entry))
                 {
-                    plan.Skipped.Add((pkg, r, "stale_source_changed"));
+                    var codeKeysOff = !_config.CodeKeys.Enabled && r.SourceFile.StartsWith("code:", StringComparison.Ordinal);
+                    plan.Skipped.Add((pkg, r, codeKeysOff ? "code_keys_disabled" : "stale_source_changed"));
                     continue;
                 }
                 if (scan.AlreadyTranslated.Contains(r.Id) || scan.Ambiguous.Contains(r.Id))
@@ -99,14 +104,23 @@ public sealed class PackBuilder
                     plan.Skipped.Add((pkg, r, "translated_elsewhere"));
                     continue;
                 }
-                var revalidate = Validator.Validate(entry.Source, r.Text, _options);
+                var revalidate = TranslationService.ValidateEntry(entry, r.Text, _options);
                 if (!revalidate.Accepted)
                 {
                     plan.Skipped.Add((pkg, r, "fails_current_validation:" + string.Join(",", revalidate.Rejects.Select(x => x.Code))));
                     continue;
                 }
+                if (entry.Code != null && !codeKeysWritten.Add(entry.InjectionPath))
+                {
+                    plan.Skipped.Add((pkg, r, "duplicate_code_key"));
+                    continue;
+                }
                 string rel;
-                if (entry.Kind == EntryKind.Keyed)
+                if (entry.Code != null)
+                {
+                    rel = langRoot + "Keyed/" + modDir + "/_CodeKeys.xml";
+                }
+                else if (entry.Kind == EntryKind.Keyed)
                 {
                     var marker = "/Keyed/";
                     var i = entry.SourceFile.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
@@ -166,7 +180,7 @@ public sealed class PackBuilder
         var manifest = new PackManifest { BuiltUtc = DateTime.UtcNow, GameVersion = _env.VersionFull };
         foreach (var (rel, items) in plan.Files.OrderBy(k => k.Key, StringComparer.Ordinal))
         {
-            var content = LanguageDataWriter.Render(items.Select(x => new LanguageDataWriter.Item(x.Entry.InjectionPath, x.Record.Text, x.Entry.Source)));
+            var content = LanguageDataWriter.Render(items.Select(x => new LanguageDataWriter.Item(x.Entry.InjectionPath, x.Record.Text, x.Entry.Code != null ? "(no English source; key used in " + x.Entry.Code.Type + "." + x.Entry.Code.Method + ")" : x.Entry.Source)));
             // Self-check before writing: the safe XML parser must read it back with the same number of entries.
             var check = SafeXml.Parse(content);
             if (check.Root == null || check.Root.Elements().Count() != items.Count)
@@ -186,6 +200,7 @@ public sealed class PackBuilder
                     File = rel,
                     Status = record.Status,
                     Flags = record.Flags.Select(f => f.Code).ToList(),
+                    Origin = entry.Code != null ? "code_key" : null,
                 });
             }
         }
@@ -255,11 +270,16 @@ public sealed class PackBuilder
     {
         var plan = Plan(onlyId == null ? null : new[] { onlyId });
         var flaggedEntries = new List<object>();
+        var codeKeyEntries = new List<object>();
         foreach (var (rel, items) in plan.Files)
         {
             foreach (var (record, entry) in items)
             {
-                if (record.Status == "flagged")
+                if (entry.Code != null)
+                {
+                    codeKeyEntries.Add(new { id = record.Id, package_id = entry.PackageId, key = entry.InjectionPath, used_in = entry.Code.Type + "." + entry.Code.Method, text = record.Text });
+                }
+                if (record.Status == "flagged" && entry.Code == null)
                 {
                     flaggedEntries.Add(new { id = record.Id, package_id = entry.PackageId, path = entry.InjectionPath, source = entry.Source, text = record.Text, flags = record.Flags });
                 }
@@ -314,6 +334,8 @@ public sealed class PackBuilder
             ready_entries = plan.Files.Sum(f => f.Value.Count),
             files = plan.Files.Count,
             flagged = flaggedEntries,
+            code_key_translations = codeKeyEntries.Count == 0 ? null : codeKeyEntries,
+            code_key_note = codeKeyEntries.Count == 0 ? null : "Keys used in mod code with no English source; their texts were inferred. Listed separately for spot-checking; they are always flagged code_key_inferred.",
             skipped = plan.Skipped.Select(s => new { package_id = s.PackageId, id = s.Record.Id, path = s.Record.Path, reason = s.Reason }).ToList(),
             pack_built = File.Exists(manifestPath),
             pack_problems = packProblems,

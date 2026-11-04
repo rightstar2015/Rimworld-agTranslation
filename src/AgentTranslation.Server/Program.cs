@@ -44,6 +44,7 @@ public static class Program
           rwat stale-report [--max-mods N] [--out FILE]
                                            Existing Simplified translations that no longer match the English (Simplified mode)
           rwat coverage [--out FILE]       Missing entries of every active mod for the target language
+          rwat code-strings [--out FILE]   Keys used in mod code that no language defines, and hardcoded UI English (stage 4)
 
         Environment: RWAT_WORK_DIR (work folder), RWAT_GAME_DIR (game folder), RWAT_PACK_OUTPUT_DIR (pack parent folder),
                      RWAT_TARGET_LANGUAGE (ChineseSimplified or ChineseTraditional; overrides config.json),
@@ -75,6 +76,7 @@ public static class Program
                     int.TryParse(Opt(args, "--max-mods"), out var m) ? Math.Clamp(m, 1, 500) : 40),
                 "stale-report" => LanguageReports.Stale(svc, int.TryParse(Opt(args, "--max-mods"), out var sm) ? Math.Clamp(sm, 1, 1000) : 1000),
                 "coverage" => LanguageReports.Coverage(svc),
+                "code-strings" => LanguageReports.CodeStrings(svc),
                 _ => null,
             };
             if (report != null)

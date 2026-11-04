@@ -1,4 +1,4 @@
-# 階段 4：寫死在程式碼裡的字串（設計，待確認）
+# 階段 4：寫死在程式碼裡的字串（已實作）
 
 規格要求：硬編碼字串擷取，預設關閉。本文件先列出在這台電腦上量到的事實，再提出範圍，最後列出需要你決定的事。
 
@@ -88,3 +88,49 @@ B 類例子：`Add tag`、`Cannot reach target.`、`Map cleared.`。另外有些
 
    不建議 B1。它影響所有模組、每幀都有成本，誤換的風險最大。
 3. **A 類譯文的審查**：這類譯文沒有英文原文，是 Agent 推測的。要直接輸出，還是先標成「待審」、由你在報告裡確認後才輸出？建議直接輸出，但報告單獨列出供抽查。理由是它取代的是原始鍵名，就算翻得不完美也比鍵名好。
+
+## 7. 決定與實作（2026-11-04）
+
+你選擇照建議做：
+- 4A 做，預設關閉。
+- 4B 只回報。
+- A 類譯文直接輸出，但在報告裡單獨列出。
+
+| 部分 | 檔案 | 說明 |
+|---|---|---|
+| IL 掃描 | `CodeStringScanner.cs` | `System.Reflection.Metadata` 讀檔，不載入組件；單一 DLL 上限 64 MB；讀到壞檔只記錄、不中斷 |
+| 鍵的判斷 | 同上 | 不帶參數時，鍵是 `Translate()` 前一個字串常數；帶參數時，鍵是第一個常數，並丟掉 `Named("PAWN")` 這類參數名。也會記下程式碼傳了幾個格式參數（`params` 陣列記為未知） |
+| 設定 | `AppConfig.cs` | `code_keys.enabled`，預設 `false`；舊的 config.json 會自動補上這一段 |
+| 掃描整合 | `ModScanner.cs` | 開啟時才掃 DLL；排除任何啟用模組（含官方）英文已定義的鍵，以及目標語言已有譯文的鍵。不寫進掃描快取，因為結果取決於其他模組的英文檔與設定 |
+| 給 Agent | `TranslationService.cs`、`McpTools.cs` | `get_batch` 的項目帶 `origin = code_key` 與 `code_context`（DLL、類別與方法、參數數量、同方法其他鍵的英文），加上 `code_key_note`；`scan_mod` 另列 `code_key` 一類 |
+| 驗證 | `Validator.ValidateCodeKey` | 通用檢查照舊（空白、XML 字元、錯字形）；佔位符依參數數量檢查；一律標 `code_key_inferred` |
+| 輸出 | `PackBuilder.cs` | 寫進 `Keyed/<mod>/_CodeKeys.xml`，註解寫「沒有英文原文；鍵用在哪個方法」；manifest 標 `origin = code_key`；同一個鍵只寫一次；關掉設定後下次建置就不輸出（原因 `code_keys_disabled`） |
+| 抽查 | `validate_pack` | `code_key_translations` 單獨列出 |
+| 4B 報告 | `rwat code-strings` | 繁中 Markdown，A、B 兩類各列前 40 個模組 |
+
+### 在這台電腦上的結果
+
+報告：`docs/reports/code-strings-2026-11-04.md`，掃描約 3 秒。
+- A 類：51 個模組、190 個鍵。比 §3 的初步數字少，因為修掉了格式參數名誤判，也扣掉了目標語言已有譯文的鍵。
+- B 類：64 個模組、587 個字串（已排除開發者字串）。
+
+MigCorp 的兩個鍵都抓到了：
+- `Settings.Tuning`，用在 `DrawSkipNetTuningSection`。
+- `Settings.SkipNetTuning.Reset`，用在 `TuningRow`。
+
+在暫存工作資料夾開啟 `code_keys` 跑完整流程：
+- `scan_mod` 多出 `code_key` 2 筆，`get_batch` 帶出上下文。
+- 送出「重置 {0}」被拒絕，因為程式碼沒有傳參數。
+- 送出「重置」與「寻路调整（高级）：」被接受，並標為推測。
+- 建置產生 `_CodeKeys.xml`，`validate_pack` 單獨列出這兩筆。
+
+你實際的工作資料夾設定維持關閉，翻譯包仍是 82 筆，沒有變化。
+
+測試：新增 8 個。掃描器用測試組件裡與遊戲同名的替身型別，驗證參數數量判斷、參數名排除、`TryTranslate` 與動態鍵排除、寫死字串篩選；另有佔位符範圍檢查。全部 107 個測試通過。
+
+### 尚未在遊戲內驗證
+
+遊戲找不到鍵時會顯示鍵名，這點已對照反編譯程式碼確認；補上的鍵會像一般 Keyed 一樣生效，則是推論。橋接模組的 Keyed 重載本來就會加入「我們的或缺少的」鍵，所以不重開遊戲也能驗證，步驟如下：
+1. 你把 config.json 的 `code_keys.enabled` 改成 `true`。
+2. 我翻譯 MigCorp 的兩個鍵並重建翻譯包。
+3. 在遊戲內重載，看 MigCorp 設定頁那行鍵名是否變成中文。

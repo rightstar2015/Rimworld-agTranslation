@@ -330,7 +330,8 @@ public sealed class SimplifiedMemory
         var result = new List<SimplifiedSuggestion>();
         var coverage = new Dictionary<string, int>(StringComparer.Ordinal);
         var candidates = new List<(SourceEntry Entry, SimplifiedSource Src)>();
-        foreach (var e in scan.Translatable)
+        // Keys used in code have no English source to compare freshness with.
+        foreach (var e in scan.Translatable.Where(e => e.Code == null))
         {
             var list = SourcesFor(e);
             if (list.Count == 0)
@@ -362,7 +363,7 @@ public sealed class SimplifiedMemory
     {
         EnsureBuilt();
         var result = new List<StaleTranslation>();
-        foreach (var e in scan.Entries.Where(e => scan.AlreadyTranslated.Contains(e.Id)))
+        foreach (var e in scan.Entries.Where(e => e.Code == null && scan.AlreadyTranslated.Contains(e.Id)))
         {
             var list = SourcesFor(e);
             if (list.Count == 0)

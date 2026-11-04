@@ -129,6 +129,44 @@ namespace AgentTranslation.Core
             return outcome;
         }
 
+        /// <summary>
+        /// Validates the translation of a key used in code that has no English source. Placeholders are checked against
+        /// the number of format arguments the code passes (when known) instead of a source text. Always flagged as
+        /// inferred, so the user can spot-check these entries.
+        /// </summary>
+        public static ValidationOutcome ValidateCodeKey(string? translation, int? argCount, ValidatorOptions? options = null)
+        {
+            var text = translation ?? string.Empty;
+            var braces = Tokens.Extract(text).Where(t => t.Kind == TokenKind.Brace).Select(t => t.Text).Distinct().ToList();
+            // Run the general checks with a pseudo-source that holds exactly the translation's braces, so they pass the
+            // source comparison and are checked against the argument count below instead.
+            var outcome = Validate(string.Join(" ", braces), text, options);
+            outcome.Flags.RemoveAll(f => f.Code == "identical_to_source" || f.Code == "length_anomaly");
+            if (!outcome.Accepted && outcome.Rejects.Any(r => r.Code == "empty" || r.Code == "too_long"))
+            {
+                return outcome;
+            }
+            foreach (var b in braces)
+            {
+                var inner = b.Trim('{', '}');
+                var index = inner.Split(':')[0];
+                if (argCount == 0)
+                {
+                    outcome.Rejects.Add(new ValidationIssue("placeholder_mismatch", "The code passes no arguments with this key, so " + b + " would show literally. Remove it."));
+                }
+                else if (argCount != null && int.TryParse(index, out var i) && (i < 0 || i >= argCount))
+                {
+                    outcome.Rejects.Add(new ValidationIssue("placeholder_mismatch", "The code passes " + argCount + " argument(s); " + b + " is out of range (use {0}.." + "{" + (argCount - 1) + "})."));
+                }
+            }
+            if (Tokens.StripTokens(text).Trim().Length > 300)
+            {
+                outcome.Flags.Add(new ValidationIssue("length_anomaly", "Unusually long for a text inferred from a key name."));
+            }
+            outcome.Flags.Add(new ValidationIssue("code_key_inferred", "No English source exists; the text was inferred from the key name and its use in code."));
+            return outcome;
+        }
+
         private static string CodeFor(TokenKind kind)
         {
             switch (kind)

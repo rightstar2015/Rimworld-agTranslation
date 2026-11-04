@@ -64,6 +64,8 @@ public sealed class AppConfig
     public List<string> ProperNouns { get; set; } = new();
     /// <summary>Auto-adopting existing Simplified translations; off by default (suggestions only). Only the user edits this file; MCP tools cannot.</summary>
     public SimplifiedAutoAdopt SimplifiedAutoAdopt { get; set; } = new();
+    /// <summary>Keys used in mod code that no language file defines (stage 4); off by default. Only the user edits this file; MCP tools cannot.</summary>
+    public CodeKeysOptions CodeKeys { get; set; } = new();
 
     [JsonIgnore]
     public string TargetLanguageFolder => TargetLanguage;
@@ -162,7 +164,7 @@ public sealed class AppConfig
             throw new InvalidOperationException("target_language must be ChineseSimplified or ChineseTraditional.");
         }
         // Older config files lack newer sections: write them back (with defaults) so the user can see what can be changed.
-        if (existingText != null && (!existingText.Contains("\"simplified_auto_adopt\"", StringComparison.Ordinal) || !existingText.Contains("\"target_language\"", StringComparison.Ordinal)))
+        if (existingText != null && (!existingText.Contains("\"simplified_auto_adopt\"", StringComparison.Ordinal) || !existingText.Contains("\"target_language\"", StringComparison.Ordinal) || !existingText.Contains("\"code_keys\"", StringComparison.Ordinal)))
         {
             detectedNew = true;
         }
@@ -182,6 +184,16 @@ public sealed class AppConfig
         }
         return config;
     }
+}
+
+/// <summary>
+/// Translating keys that mod code passes to Translate() but no language file defines (the game shows the raw key).
+/// They have no English source, so the agent infers the text; every such translation is flagged code_key_inferred.
+/// </summary>
+public sealed class CodeKeysOptions
+{
+    /// <summary>When false (default), mod assemblies are not scanned for keys and no such entry is offered or written.</summary>
+    public bool Enabled { get; set; }
 }
 
 /// <summary>
