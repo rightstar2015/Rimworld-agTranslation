@@ -48,6 +48,23 @@ public static class Program
         {
             var config = AppConfig.Load();
             using var svc = new TranslationService(config);
+            if (cmd == "s2t-report")
+            {
+                var count = int.TryParse(Opt(args, "--count"), out var c) ? Math.Clamp(c, 1, 200) : 20;
+                var maxMods = int.TryParse(Opt(args, "--max-mods"), out var m) ? Math.Clamp(m, 1, 500) : 40;
+                var report = SpotCheckReport.Generate(svc, count, maxMods);
+                var target = Opt(args, "--out");
+                if (target != null)
+                {
+                    File.WriteAllText(target, report, new UTF8Encoding(false));
+                    Console.Error.WriteLine("已寫入 " + target);
+                }
+                else
+                {
+                    Console.WriteLine(report);
+                }
+                return 0;
+            }
             object result = cmd switch
             {
                 "env" => svc.GetEnvironment(),

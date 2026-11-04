@@ -249,3 +249,44 @@ public class SimplifiedListTests
         Assert.Empty(SimplifiedChars.FindIn(shared));
     }
 }
+
+public class ChineseConversionTests
+{
+    private static readonly AgentTranslation.Server.ChineseResources Zh =
+        AgentTranslation.Server.ChineseResources.Load(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rwat-no-game"));
+
+    [Theory]
+    [InlineData("头发", "頭髮")]
+    [InlineData("发现", "發現")]
+    [InlineData("里面", "裡面")]
+    [InlineData("软件", "軟體")]
+    [InlineData("群落中心", "群落中心")]
+    [InlineData("机械体正在自主作战", "機械體正在自主作戰")]
+    [InlineData("按钮", "按鈕")]
+    public void Converts_WithTaiwanPhrasesAndVariants(string sc, string tc)
+    {
+        Assert.Equal(tc, Zh.Converter.Convert(sc).Text);
+    }
+
+    [Fact]
+    public void Ambiguous_CharacterFallback_IsReported()
+    {
+        var r = Zh.Converter.Convert("后");
+        Assert.Contains(r.Segments, s => s.Ambiguous);
+    }
+
+    [Fact]
+    public void SimplifiedSet_AccountsForTaiwanVariants()
+    {
+        Assert.Empty(SimplifiedChars.FindIn("沒有足夠空間放置指定數量的群落中心"));
+        Assert.NotEmpty(SimplifiedChars.FindIn("没有"));
+    }
+
+    [Fact]
+    public void ScriptCompatibility()
+    {
+        Assert.True(Zh.IsScriptCompatible("头发", "頭髮"));
+        Assert.False(Zh.IsScriptCompatible("按钮", "鈕扣"));
+        Assert.False(Zh.IsScriptCompatible("机械", "器械"));
+    }
+}

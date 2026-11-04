@@ -17,6 +17,8 @@ public sealed class AppConfig
     public string? GameDir { get; set; }
     public List<string> WorkshopDirs { get; set; } = new();
     public string? ConfigDir { get; set; }
+    /// <summary>翻譯包輸出的上層資料夾；null 表示遊戲的 Mods 資料夾。可用環境變數 RWAT_PACK_OUTPUT_DIR 覆寫。</summary>
+    public string? PackOutputDir { get; set; }
     public string PackFolderName { get; set; } = "!AgentTranslation_Pack";
     public string PackPackageId { get; set; } = "agenttranslation.pack";
     public string PackDisplayName { get; set; } = "Agent Translation Pack (繁體中文)";
@@ -31,7 +33,11 @@ public sealed class AppConfig
     public string WorkDir { get; private set; } = string.Empty;
 
     [JsonIgnore]
-    public string PackDir => Path.Combine(RequireGameDir(), "Mods", PackFolderName);
+    public string PackDir => Path.Combine(PackOutputRoot, PackFolderName);
+
+    /// <summary>翻譯包所在的上層資料夾。未設定時為 &lt;GameDir&gt;/Mods。</summary>
+    [JsonIgnore]
+    public string PackOutputRoot => string.IsNullOrWhiteSpace(PackOutputDir) ? Path.Combine(RequireGameDir(), "Mods") : Path.GetFullPath(PackOutputDir!);
 
     public string RequireGameDir()
     {
@@ -75,6 +81,11 @@ public sealed class AppConfig
         if (!string.IsNullOrWhiteSpace(envGame))
         {
             config.GameDir = envGame;
+        }
+        var envPack = Environment.GetEnvironmentVariable("RWAT_PACK_OUTPUT_DIR");
+        if (!string.IsNullOrWhiteSpace(envPack))
+        {
+            config.PackOutputDir = envPack;
         }
         var detectedNew = false;
         if (string.IsNullOrEmpty(config.GameDir))

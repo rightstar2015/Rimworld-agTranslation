@@ -48,7 +48,11 @@ namespace AgentTranslation.Core
         private static readonly Regex TagRegex = new Regex(@"\([\*/][^\)]*\)", RegexOptions.CultureInvariant);
         private static readonly Regex GrammarRegex = new Regex(@"\[[A-Za-z_][A-Za-z0-9_]*\]", RegexOptions.CultureInvariant);
 
-        public static List<Token> Extract(string text)
+        /// <summary>
+        /// includeGrammar：是否把 [xxx] 當成文法 token。只有 RulePack 規則字串需要；
+        /// 一般 Keyed／Def 文字中的方括號是普通文字（例如「[Zone] 分頁」）。
+        /// </summary>
+        public static List<Token> Extract(string text, bool includeGrammar = false)
         {
             var result = new List<Token>();
             if (string.IsNullOrEmpty(text))
@@ -71,9 +75,12 @@ namespace AgentTranslation.Core
             {
                 result.Add(new Token(TokenKind.Tag, m.Value, m.Value));
             }
-            foreach (Match m in GrammarRegex.Matches(text))
+            if (includeGrammar)
             {
-                result.Add(new Token(TokenKind.Grammar, m.Value, m.Value));
+                foreach (Match m in GrammarRegex.Matches(text))
+                {
+                    result.Add(new Token(TokenKind.Grammar, m.Value, m.Value));
+                }
             }
 
             int newlines = CountOccurrences(text, "\\n") + text.Count(c => c == '\n');
@@ -94,16 +101,15 @@ namespace AgentTranslation.Core
             var s = BraceRegex.Replace(text, " ");
             s = MarkupRegex.Replace(s, " ");
             s = TagRegex.Replace(s, " ");
-            s = GrammarRegex.Replace(s, " ");
             s = s.Replace("\\n", " ").Replace('\n', ' ');
             return s;
         }
 
         /// <summary>回傳 (缺少的, 多出來的) token，依種類分組。</summary>
-        public static Dictionary<TokenKind, (List<string> Missing, List<string> Extra)> Diff(string source, string translation)
+        public static Dictionary<TokenKind, (List<string> Missing, List<string> Extra)> Diff(string source, string translation, bool includeGrammar = false)
         {
-            var src = Extract(source);
-            var dst = Extract(translation);
+            var src = Extract(source, includeGrammar);
+            var dst = Extract(translation, includeGrammar);
             var diff = new Dictionary<TokenKind, (List<string>, List<string>)>();
             foreach (TokenKind kind in Enum.GetValues(typeof(TokenKind)))
             {

@@ -11,7 +11,10 @@ namespace AgentTranslation.Core
     {
         public const long MaxFileBytes = 32L * 1024 * 1024;
 
-        public static XDocument LoadFile(string path)
+        public static XDocument LoadFile(string path) => LoadFile(path, keepComments: false);
+
+        /// <summary>keepComments = true 時保留註解（用來讀取翻譯檔中的 &lt;!-- EN: … --&gt; 原文註記）。</summary>
+        public static XDocument LoadFile(string path, bool keepComments)
         {
             var info = new FileInfo(path);
             if (info.Length > MaxFileBytes)
@@ -20,7 +23,7 @@ namespace AgentTranslation.Core
             }
             using (var stream = File.OpenRead(path))
             {
-                return Load(stream);
+                return Load(stream, keepComments);
             }
         }
 
@@ -33,9 +36,13 @@ namespace AgentTranslation.Core
             }
         }
 
-        public static XDocument Load(Stream stream)
+        public static XDocument Load(Stream stream) => Load(stream, keepComments: false);
+
+        public static XDocument Load(Stream stream, bool keepComments)
         {
-            using (var xml = XmlReader.Create(stream, Settings()))
+            var settings = Settings();
+            settings.IgnoreComments = !keepComments;
+            using (var xml = XmlReader.Create(stream, settings))
             {
                 return XDocument.Load(xml, LoadOptions.SetLineInfo);
             }

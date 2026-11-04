@@ -11,6 +11,10 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
   <ItemGroup>
+    <!-- OpenCC 1.4.2 字典（Apache-2.0），見 Data/opencc/NOTICE.md -->
+    <EmbeddedResource Include="Data\opencc\*.txt" LogicalName="opencc/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\AgentTranslation.Core\AgentTranslation.Core.csproj" />
   </ItemGroup>
   <ItemGroup>

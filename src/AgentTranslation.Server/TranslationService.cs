@@ -32,6 +32,23 @@ public sealed class TranslationService : IDisposable
     public AppConfig Config => _config;
     public GameEnvironment Env => _env;
 
+    private ChineseResources? _chinese;
+    private SimplifiedMemory? _simplified;
+
+    /// <summary>OpenCC 字典與官方術語表（第一次使用時載入，並把簡體字偵測換成完整集合）。</summary>
+    public ChineseResources Chinese => _chinese ??= ChineseResources.Load(_env.GameDir);
+
+    /// <summary>全域簡中翻譯記憶（第一次使用時建立）。</summary>
+    public SimplifiedMemory Simplified => _simplified ??= new SimplifiedMemory(_config, _env, Chinese);
+
+    public ModScan Scan(InstalledMod mod)
+    {
+        lock (_lock)
+        {
+            return _scanner.Scan(mod);
+        }
+    }
+
     public void Reload()
     {
         lock (_lock)
@@ -39,6 +56,7 @@ public sealed class TranslationService : IDisposable
             _scanner.Dispose();
             _env = GameEnvironment.Load(_config);
             _scanner = new ModScanner(_config, _env);
+            _simplified = null;
         }
     }
 
