@@ -96,6 +96,11 @@ MCP Server 不提供 shell、任意檔案讀寫、網路存取工具。
 
 ## 第三層：預設關閉或實驗性系統
 
+### 執行期逐條驗證（階段 3，提議中）
+橋接模組讀取遊戲實際載入的 Keyed 與 DefInjected 資料，逐條確認翻譯包的譯文是否生效、是否被其他模組（例如在執行期注入譯文的模組）覆蓋。
+風險：只讀取遊戲物件，不修改；但讀取 private 結構時 Waylith 或遊戲更新可能改變欄位。
+規則：只使用 public 欄位（`keyedReplacements`、`defInjections`、`DefInjection.injected/fileSource/injection`）；找不到成員就把該項標為 `unknown` 並記錄，不猜測替代成員。報告不含存檔名、殖民者名或系統使用者名稱。詳見 `docs/STAGE3_DESIGN.md`。
+
 ### 翻譯重載（實驗性，階段 3）
 寫入 `LanguageDatabase` 讓翻譯不重開遊戲即生效。
 風險：快取在靜態欄位裡的字串不會更新、部分 UI 狀態不一致、各版本內部結構不同。
