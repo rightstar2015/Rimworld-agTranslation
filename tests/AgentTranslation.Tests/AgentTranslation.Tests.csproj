@@ -10,6 +10,7 @@
     <ProjectReference Include="..\..\src\AgentTranslation.Server\AgentTranslation.Server.csproj" />
     <!-- The bridge mod's game-independent parts. InboxRequest.cs comes in through the Server project. -->
     <Compile Include="..\..\src\AgentTranslation.Bridge\PackReader.cs" Link="Bridge\PackReader.cs" />
+    <Compile Include="..\..\src\AgentTranslation.Bridge\UserConfigFile.cs" Link="Bridge\UserConfigFile.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="[17.14.1]" />

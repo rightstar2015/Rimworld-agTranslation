@@ -63,12 +63,77 @@ public sealed class BridgeMod : Mod
         {
             Bridge.RequestReloadKeyed(null);
         }
-        list.Gap();
+        // Settings first: the report below can grow and must not push them out of the window.
+        list.GapLine();
+        DrawToolSettings(list);
+        list.GapLine();
         foreach (var line in Bridge.StatusLines())
         {
             list.Label(line);
         }
         list.End();
+    }
+
+    private UserConfigFile.Values? _toolConfig;
+    private string? _toolConfigError;
+    private DateTime _toolConfigReadUtc;
+    private bool _toolConfigSaved;
+
+    /// <summary>
+    /// The user's rwat switches (stored in config.json). Re-read at most every 2 seconds while the window is open, so
+    /// edits made in the file show up too.
+    /// </summary>
+    private void DrawToolSettings(Listing_Standard list)
+    {
+        list.Label(GameApi.T("AgentTranslationBridge.ToolSettings"));
+        var path = Bridge.UserConfigPath;
+        if (path == null)
+        {
+            list.Label(GameApi.T("AgentTranslationBridge.ToolSettingsCustomDir"));
+            return;
+        }
+        if (DateTime.UtcNow - _toolConfigReadUtc > TimeSpan.FromSeconds(2))
+        {
+            _toolConfig = UserConfigFile.Read(path, out _toolConfigError);
+            _toolConfigReadUtc = DateTime.UtcNow;
+        }
+        if (_toolConfig == null)
+        {
+            list.Label(_toolConfigError == "not_found"
+                ? GameApi.T("AgentTranslationBridge.ToolSettingsMissing", path)
+                : GameApi.T("AgentTranslationBridge.ToolSettingsError", _toolConfigError ?? "?"));
+            return;
+        }
+        var current = _toolConfig;
+        var lang = current.TargetLanguage;
+        list.Label(GameApi.T("AgentTranslationBridge.LanguageHeader"));
+        foreach (var option in UserConfigFile.Languages)
+        {
+            if (list.RadioButton(GameApi.T("AgentTranslationBridge.Language." + option), lang == option, 12f))
+            {
+                lang = option;
+            }
+        }
+        var codeKeys = current.CodeKeys;
+        var autoAdopt = current.AutoAdopt;
+        list.CheckboxLabeled(GameApi.T("AgentTranslationBridge.CodeKeys"), ref codeKeys, GameApi.T("AgentTranslationBridge.CodeKeysTip"));
+        list.CheckboxLabeled(GameApi.T("AgentTranslationBridge.AutoAdopt"), ref autoAdopt, GameApi.T("AgentTranslationBridge.AutoAdoptTip"));
+        var changed = new UserConfigFile.Values(lang, codeKeys, autoAdopt);
+        if (changed != current)
+        {
+            if (UserConfigFile.Write(path, changed, out var error))
+            {
+                _toolConfig = changed;
+                _toolConfigSaved = true;
+            }
+            else
+            {
+                _toolConfigError = error;
+                _toolConfig = null;
+            }
+            _toolConfigReadUtc = DateTime.UtcNow;
+        }
+        list.Label(GameApi.T(_toolConfigSaved ? "AgentTranslationBridge.ToolSettingsSaved" : "AgentTranslationBridge.ToolSettingsNote"));
     }
 }
 

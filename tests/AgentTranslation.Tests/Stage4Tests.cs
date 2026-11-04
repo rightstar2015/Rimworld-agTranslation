@@ -196,6 +196,82 @@ public class DataLocationTests
     }
 }
 
+public class UserConfigFileTests
+{
+    private static string TempFile(string content)
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rwat-cfg-" + System.Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        var path = System.IO.Path.Combine(dir, "config.json");
+        System.IO.File.WriteAllText(path, content);
+        return path;
+    }
+
+    [Fact]
+    public void ChangesOnlyTheThreeSwitchesAndKeepsEverythingElse()
+    {
+        var path = TempFile("{\"game_dir\":\"F:/RimWorld\",\"target_language\":\"ChineseSimplified\",\"code_keys\":{\"enabled\":false},\"pack_display_name\":\"简体包\",\"unknown_future\":[1,2]}");
+        try
+        {
+            var v = AgentTranslation.Bridge.UserConfigFile.Read(path, out var error);
+            Assert.Null(error);
+            Assert.Equal(new AgentTranslation.Bridge.UserConfigFile.Values("ChineseSimplified", false, false), v);
+            Assert.True(AgentTranslation.Bridge.UserConfigFile.Write(path, new AgentTranslation.Bridge.UserConfigFile.Values("auto", true, true), out _));
+            var text = System.IO.File.ReadAllText(path);
+            Assert.Contains("简体包", text);
+            Assert.Contains("unknown_future", text);
+            Assert.Contains("F:/RimWorld", text);
+            Assert.Equal(new AgentTranslation.Bridge.UserConfigFile.Values("auto", true, true), AgentTranslation.Bridge.UserConfigFile.Read(path, out _));
+            // The server reads the same file.
+            var cfg = System.Text.Json.JsonSerializer.Deserialize<AppConfig>(text, AppConfig.Json)!;
+            Assert.Equal("auto", cfg.TargetLanguageSetting);
+            Assert.True(cfg.CodeKeys.Enabled);
+            Assert.True(cfg.SimplifiedAutoAdopt.Enabled);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(System.IO.Path.GetDirectoryName(path)!, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("{not json", "invalid_json")]
+    [InlineData("[1]", "not_an_object")]
+    public void RefusesBrokenFilesWithoutWriting(string content, string expected)
+    {
+        var path = TempFile(content);
+        try
+        {
+            Assert.Null(AgentTranslation.Bridge.UserConfigFile.Read(path, out var error));
+            Assert.Equal(expected, error);
+            Assert.False(AgentTranslation.Bridge.UserConfigFile.Write(path, new AgentTranslation.Bridge.UserConfigFile.Values("auto", false, false), out _));
+            Assert.Equal(content, System.IO.File.ReadAllText(path));
+        }
+        finally
+        {
+            System.IO.Directory.Delete(System.IO.Path.GetDirectoryName(path)!, true);
+        }
+    }
+
+    [Fact]
+    public void NeverCreatesTheFileAndRejectsUnknownLanguages()
+    {
+        var missing = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rwat-none-" + System.Guid.NewGuid().ToString("N"), "config.json");
+        Assert.False(AgentTranslation.Bridge.UserConfigFile.Write(missing, new AgentTranslation.Bridge.UserConfigFile.Values("auto", false, false), out var error));
+        Assert.Equal("not_found", error);
+        Assert.False(System.IO.File.Exists(missing));
+        Assert.False(AgentTranslation.Bridge.UserConfigFile.Write(missing, new AgentTranslation.Bridge.UserConfigFile.Values("Japanese", false, false), out error));
+        Assert.Equal("invalid_language", error);
+    }
+
+    [Fact]
+    public void FindsConfigNextToTheDefaultBridgeFolderOnly()
+    {
+        Assert.Equal(System.IO.Path.Combine("C:\\x\\AgentTranslation", "config.json"), AgentTranslation.Bridge.UserConfigFile.PathFor("C:\\x\\AgentTranslation\\bridge"));
+        Assert.Null(AgentTranslation.Bridge.UserConfigFile.PathFor("C:\\x\\custom"));
+    }
+}
+
 public class CodeKeyValidationTests
 {
     private static readonly ValidatorOptions Sc = new ValidatorOptions { Script = TargetScript.Simplified };

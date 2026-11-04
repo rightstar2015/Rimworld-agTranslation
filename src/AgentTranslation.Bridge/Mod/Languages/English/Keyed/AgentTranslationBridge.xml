@@ -18,4 +18,18 @@
   <AgentTranslationBridge.ProblemRow>{0}: overridden {1}, changed {2}, not in effect {3}</AgentTranslationBridge.ProblemRow>
   <AgentTranslationBridge.ReloadResult>Keyed reload: {0} entries applied.</AgentTranslationBridge.ReloadResult>
   <AgentTranslationBridge.ReloadDisabled>Keyed reload is turned off.</AgentTranslationBridge.ReloadDisabled>
+  <AgentTranslationBridge.ToolSettings>Translation tool settings (rwat)</AgentTranslationBridge.ToolSettings>
+  <AgentTranslationBridge.LanguageHeader>Pack language:</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.Language.auto>Follow the game language</AgentTranslationBridge.Language.auto>
+  <AgentTranslationBridge.Language.ChineseSimplified>Simplified Chinese</AgentTranslationBridge.Language.ChineseSimplified>
+  <AgentTranslationBridge.Language.ChineseTraditional>Traditional Chinese</AgentTranslationBridge.Language.ChineseTraditional>
+  <AgentTranslationBridge.CodeKeys>Translate keys that mods forgot to define</AgentTranslationBridge.CodeKeys>
+  <AgentTranslationBridge.CodeKeysTip>Some mods show raw key names (such as Some.Key.Name) even in English. When on, your AI assistant infers a text from the key name; each one is marked as inferred.</AgentTranslationBridge.CodeKeysTip>
+  <AgentTranslationBridge.AutoAdopt>Traditional mode: adopt existing Simplified translations automatically</AgentTranslationBridge.AutoAdopt>
+  <AgentTranslationBridge.AutoAdoptTip>Converts existing Simplified translations to Traditional and uses them directly, under the conditions set in config.json. Only has an effect when the pack language is Traditional Chinese.</AgentTranslationBridge.AutoAdoptTip>
+  <AgentTranslationBridge.ToolSettingsNote>Changes are saved to rwat's config.json and take effect after you restart your AI assistant.</AgentTranslationBridge.ToolSettingsNote>
+  <AgentTranslationBridge.ToolSettingsSaved>Saved to config.json. Restart your AI assistant to apply.</AgentTranslationBridge.ToolSettingsSaved>
+  <AgentTranslationBridge.ToolSettingsMissing>rwat's settings file was not found ({0}). Run rwat once first.</AgentTranslationBridge.ToolSettingsMissing>
+  <AgentTranslationBridge.ToolSettingsError>The settings file could not be read or written ({0}).</AgentTranslationBridge.ToolSettingsError>
+  <AgentTranslationBridge.ToolSettingsCustomDir>The bridge folder is set with RWAT_BRIDGE_DIR, so rwat's settings file cannot be located. Edit config.json directly.</AgentTranslationBridge.ToolSettingsCustomDir>
 </LanguageData>

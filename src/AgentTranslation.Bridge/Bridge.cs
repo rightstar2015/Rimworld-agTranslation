@@ -55,6 +55,9 @@ internal sealed class Bridge
     private bool _menuDone, _playDone;
     private (string RequestId, string Kind, string Status, int Applied)? _lastRequest;
 
+    /// <summary>rwat's config.json next to the bridge folder; null when RWAT_BRIDGE_DIR points somewhere else.</summary>
+    internal string? UserConfigPath { get; }
+
     public Bridge(BridgeMod mod)
     {
         _mod = mod;
@@ -64,6 +67,7 @@ internal sealed class Bridge
             ? Path.GetFullPath(custom)
             : Path.Combine(GameApi.SaveDataFolder(), "AgentTranslation", "bridge");
         _inbox = Path.Combine(_dir, "inbox");
+        UserConfigPath = UserConfigFile.PathFor(_dir);
         _outbox = Path.Combine(_dir, "outbox");
     }
 

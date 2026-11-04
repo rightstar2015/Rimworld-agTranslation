@@ -18,4 +18,18 @@
   <AgentTranslationBridge.ProblemRow>{0}：被覆盖 {1}，被更改 {2}，未生效 {3}</AgentTranslationBridge.ProblemRow>
   <AgentTranslationBridge.ReloadResult>Keyed 重新加载：已套用 {0} 条。</AgentTranslationBridge.ReloadResult>
   <AgentTranslationBridge.ReloadDisabled>Keyed 重新加载已关闭。</AgentTranslationBridge.ReloadDisabled>
+  <AgentTranslationBridge.ToolSettings>翻译工具设置（rwat）</AgentTranslationBridge.ToolSettings>
+  <AgentTranslationBridge.LanguageHeader>翻译包语言：</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.Language.auto>跟随游戏语言</AgentTranslationBridge.Language.auto>
+  <AgentTranslationBridge.Language.ChineseSimplified>简体中文</AgentTranslationBridge.Language.ChineseSimplified>
+  <AgentTranslationBridge.Language.ChineseTraditional>繁体中文</AgentTranslationBridge.Language.ChineseTraditional>
+  <AgentTranslationBridge.CodeKeys>补上模组漏定义的键</AgentTranslationBridge.CodeKeys>
+  <AgentTranslationBridge.CodeKeysTip>有些模组的界面连英文都显示成键名（例如 Some.Key.Name）。开启后 AI 助手会根据键名推测译文，每条都会标记为推测。</AgentTranslationBridge.CodeKeysTip>
+  <AgentTranslationBridge.AutoAdopt>繁体模式：自动采用现成的简体译文</AgentTranslationBridge.AutoAdopt>
+  <AgentTranslationBridge.AutoAdoptTip>按 config.json 中设置的条件，把现成的简体译文转换为繁体后直接使用。只在翻译包语言为繁体中文时有效。</AgentTranslationBridge.AutoAdoptTip>
+  <AgentTranslationBridge.ToolSettingsNote>修改会保存到 rwat 的 config.json，重新启动 AI 助手后生效。</AgentTranslationBridge.ToolSettingsNote>
+  <AgentTranslationBridge.ToolSettingsSaved>已保存到 config.json。重新启动 AI 助手后生效。</AgentTranslationBridge.ToolSettingsSaved>
+  <AgentTranslationBridge.ToolSettingsMissing>找不到 rwat 的设置文件（{0}）。请先运行一次 rwat。</AgentTranslationBridge.ToolSettingsMissing>
+  <AgentTranslationBridge.ToolSettingsError>无法读取或写入设置文件（{0}）。</AgentTranslationBridge.ToolSettingsError>
+  <AgentTranslationBridge.ToolSettingsCustomDir>桥接文件夹由 RWAT_BRIDGE_DIR 指定，无法找到 rwat 的设置文件，请直接编辑 config.json。</AgentTranslationBridge.ToolSettingsCustomDir>
 </LanguageData>
