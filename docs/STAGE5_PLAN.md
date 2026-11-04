@@ -81,3 +81,28 @@
 2. **測試用的客戶端**：從 Claude 桌面版、VS Code（Copilot）、Antigravity、MCP Inspector 中選至少 2 個。
 3. **玩家指南的語言版本**：繁中、簡中、英文，要哪些？
 4. **選配項目 A**（開關搬到遊戲內設定頁）：這個階段做，還是之後再說？
+
+## 4. 進度檢查點（2026-11-04）
+
+已完成並提交：
+- 資料夾搬到遊戲資料夾，並遷移舊資料（f07da7f）。
+- 遊戲內開關，即選配項目 A（2dbe245）。
+- 安全性自我檢查，加上攻擊式 MCP 檢查 46 項（e14a9d0）。
+- 發佈腳本與 SHA-256（6838633）。
+- 五種語言的玩家指南與 README（d4f99ea）。
+- 測試 120 個全過。
+
+你已經回覆、恢復工作時照做：
+- 遊戲已關閉，可以直接安裝新版橋接模組（`rwat install-bridge`）。
+- 發佈版 `rwat.exe` 要複製到 `F:\Apps\Tools\rwat\`。
+- 兩個 MCP 設定由我寫入：
+  - Code 分頁：新的測試資料夾加 `.mcp.json`。
+  - 對話分頁：Claude 桌面版的 `claude_desktop_config.json`，實際位置在封裝轉存的 `Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\`，寫入前先確認。
+
+剩下的步驟：
+1. 安裝新版橋接模組，複製 rwat.exe，寫入兩個 MCP 設定。
+2. 遊戲內驗證：
+   - 報告寫到新的 `AgentTranslation\bridge`。
+   - 設定頁出現「翻译工具设置」，切換開關後 config.json 跟著改。
+3. 客戶端測試：Code 分頁與對話分頁各跑一次完整流程，記錄在 `docs/CLIENT_TESTS.md`。
+4. 階段 5 結案報告，並更新 SECURITY_REVIEW 的最後結論。
