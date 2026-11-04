@@ -189,7 +189,9 @@ public sealed partial class TranslationService
                 {
                     found[phrase] = new { en = u.Source, zh = u.Target, origin = u.Origin, note = u.Note };
                 }
-                else if (official.TryGetValue(phrase, out var o))
+                // Single-word official names are often ordinary words with a game-specific meaning (Still -> stillborn,
+                // Clear -> weather); suggest them only for short label-like sources.
+                else if ((n > 1 || words.Count <= 4) && official.TryGetValue(phrase, out var o))
                 {
                     found[phrase] = new { en = phrase, zh = o, origin = "official", note = (string?)null };
                 }
