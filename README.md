@@ -1,4 +1,4 @@
-# RimWorld Agent Translation (work in progress)
+# RimWorld Agent Translation
 
 Lets any MCP-capable AI agent produce Chinese translation packs for RimWorld 1.7 mods, in Simplified Chinese (default) or Traditional Chinese (Taiwan usage).
 
@@ -20,31 +20,51 @@ This tool never calls an AI service and needs no API key. The agent you already 
 2. Connect `rwat` to your MCP client (see below). It finds the game, the Workshop folder and your mod list by itself.
 3. Set the game language to Simplified or Traditional Chinese, then ask your agent to translate your active mods and build the pack. Restart the game and enable `Agent Translation Pack`.
 
-No configuration file needs editing for this. A player guide draft (Traditional Chinese) is in `docs/PLAYER_GUIDE.md`.
+No configuration file needs editing for this. Player guides: [English](docs/guide/PLAYER_GUIDE.en.md) · [简体中文](docs/guide/PLAYER_GUIDE.zh-CN.md) · [繁體中文](docs/guide/PLAYER_GUIDE.zh-TW.md) · [日本語](docs/guide/PLAYER_GUIDE.ja.md) · [한국어](docs/guide/PLAYER_GUIDE.ko.md).
+
+Requirements: RimWorld 1.7 started at least once (rwat keeps its work folder inside the game's data folder), Windows x64, and an MCP client.
+
+## Release files and verification
+
+A release contains `rwat.exe` (self-contained, no .NET install needed), `AgentTranslation_Bridge-<version>.zip`, this README, `LICENSE`, `THIRD_PARTY_NOTICES.md` and `SHA256SUMS.txt`. Check a download with:
+
+```
+Get-FileHash rwat.exe -Algorithm SHA256
+```
 
 ## Build
 
 ```bash
-dotnet test
+dotnet test tests/AgentTranslation.Tests
 ```
 
 ```bash
-dotnet publish src/AgentTranslation.Server -c Release
+powershell -ExecutionPolicy Bypass -File tools/build-release.ps1 -RimWorldDir "C:\path\to\RimWorld"
 ```
+
+The release script runs the tests, publishes `rwat.exe`, builds and zips the bridge mod against your local game install (its assemblies are referenced, never copied) and writes `SHA256SUMS.txt`.
 
 ## Use with an MCP client
 
-The server speaks MCP over stdio: `rwat serve`. Example for Claude Code:
+The server speaks MCP over stdio: `rwat serve`.
+
+Claude Code:
 
 ```bash
 claude mcp add rimworld-translation -- "C:\path\to\rwat.exe" serve
+```
+
+Claude desktop app (chat), in Settings > Developer > Edit Config:
+
+```json
+{ "mcpServers": { "rimworld-translation": { "command": "C:\\path\\to\\rwat.exe", "args": ["serve"] } } }
 ```
 
 Tools: `get_environment`, `list_mods`, `scan_mod`, `get_batch`, `submit_translations`, `validate_pack`, `build_pack`, `query_memory`, `glossary_get`, `glossary_add`, `adopt_simplified`, `request_reload`. None of them runs commands, reads arbitrary files or accesses the network.
 
 ## Optional in-game bridge
 
-`Agent Translation Bridge` is a small companion mod. After the game loads it checks which pack translations are actually in effect (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed texts without restarting (experimental, off by default). It only uses the `AgentTranslation\bridge` folder inside RimWorld's data folder (next to `Saves` and `Config`) and opens no network port.
+`Agent Translation Bridge` is a small companion mod. After the game loads it checks which pack translations are actually in effect (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed texts without restarting (experimental, off by default). Its settings page also holds your rwat switches (pack language, keys used in code, auto-adopt), so players never need to open `config.json`. It only uses the `AgentTranslation` folder inside RimWorld's data folder (next to `Saves` and `Config`) and opens no network port.
 
 ```bash
 dotnet build src/AgentTranslation.Bridge -p:RimWorldDir="C:\path\to\RimWorld"
@@ -83,8 +103,14 @@ rwat build
 | `simplified_auto_adopt.enabled` | `false` | Lets existing Simplified translations be adopted automatically under the conditions you set |
 | `code_keys.enabled` | `false` | Also offers keys that mod code uses but no language file defines (the game shows the raw key). They have no English source, so the agent infers the text; each one is flagged for review |
 
-Only you edit this file; MCP tools cannot change it.
+Only you change these settings, in this file or on the bridge mod's settings page; MCP tools cannot change them. Changes take effect when rwat restarts.
+
+Why the game's data folder: when rwat is started by a packaged app such as the Claude desktop app, folders it creates under `AppData\Local` or `AppData\Roaming` are redirected to that app's private storage, where neither you nor the game can see them. `get_environment` warns if a data folder is set there.
+
+## Security
+
+See `docs/SECURITY_REVIEW.md` (Traditional Chinese) for the review against the project's security requirements. `tools/security_check.py` runs hostile inputs against `rwat serve` using scratch folders only. Mod text is treated as untrusted data; the tools never run commands, read arbitrary files or access the network, and every write goes through a path sandbox.
 
 ## License
 
-MIT. Design ideas from RimWorld-Auto-AI-Translation-Core; none of its code is used. OpenCC dictionary data is Apache-2.0 (see `src/AgentTranslation.Server/Data/opencc/NOTICE.md`).
+MIT. Third-party components are listed in `THIRD_PARTY_NOTICES.md` (the MCP C# SDK and OpenCC dictionaries are Apache-2.0, .NET components are MIT). Design ideas from RimWorld-Auto-AI-Translation-Core; none of its code is used.
