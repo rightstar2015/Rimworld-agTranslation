@@ -144,8 +144,10 @@ public class TargetLanguageAutoTests
     [Theory]
     [InlineData("auto", "ChineseTraditional (繁體中文)", "ChineseTraditional", "game_language")]
     [InlineData("auto", "ChineseSimplified (简体中文)", "ChineseSimplified", "game_language")]
-    [InlineData("auto", "English", "ChineseSimplified", "default (game language is not Chinese)")]
-    [InlineData("auto", null, "ChineseSimplified", "default (game language is not Chinese)")]
+    [InlineData("auto", "English", "English", "game_language")]
+    [InlineData("auto", "Japanese (日本語)", "Japanese", "game_language")]
+    [InlineData("auto", "Klingon", "ChineseSimplified", "default (game language unknown)")]
+    [InlineData("auto", null, "ChineseSimplified", "default (game language unknown)")]
     [InlineData("ChineseSimplified", "ChineseTraditional (繁體中文)", "ChineseSimplified", "config")]
     public void PicksTheEffectiveLanguage(string setting, string? game, string expected, string source)
     {
@@ -260,7 +262,7 @@ public class UserConfigFileTests
         Assert.False(AgentTranslation.Bridge.UserConfigFile.Write(missing, new AgentTranslation.Bridge.UserConfigFile.Values("auto", false, false), out var error));
         Assert.Equal("not_found", error);
         Assert.False(System.IO.File.Exists(missing));
-        Assert.False(AgentTranslation.Bridge.UserConfigFile.Write(missing, new AgentTranslation.Bridge.UserConfigFile.Values("Japanese", false, false), out error));
+        Assert.False(AgentTranslation.Bridge.UserConfigFile.Write(missing, new AgentTranslation.Bridge.UserConfigFile.Values("Klingon", false, false), out error));
         Assert.Equal("invalid_language", error);
     }
 

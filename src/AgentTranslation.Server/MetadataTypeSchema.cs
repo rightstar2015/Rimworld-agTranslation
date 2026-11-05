@@ -39,7 +39,9 @@ public sealed class MetadataTypeSchema : ITypeSchema, IDisposable
         }
         try
         {
-            var pe = new PEReader(File.OpenRead(path));
+            // The reader keeps the file open for the life of the server. Share delete/write so Steam updates and
+            // install-bridge can still replace the file (Windows keeps the old content alive for this handle).
+            var pe = new PEReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
             if (!pe.HasMetadata)
             {
                 pe.Dispose();

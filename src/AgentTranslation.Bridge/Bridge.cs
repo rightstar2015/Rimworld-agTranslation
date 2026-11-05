@@ -450,6 +450,33 @@ internal sealed class Bridge
 
     // ---------------- Settings page ----------------
 
+    /// <summary>One status line and one "what to do next" line for the simple settings page.</summary>
+    public (string Status, string Next) SimpleStatus()
+    {
+        if (_busy)
+        {
+            return (GameApi.T("AgentTranslationBridge.Working"), string.Empty);
+        }
+        var s = _summary;
+        if (s == null)
+        {
+            return (GameApi.T("AgentTranslationBridge.NoReport"), GameApi.T("AgentTranslationBridge.SimpleNextWait"));
+        }
+        if (!s.PackFound)
+        {
+            return (GameApi.T("AgentTranslationBridge.SimpleNoPack"), GameApi.T("AgentTranslationBridge.SimpleNextTranslate"));
+        }
+        if (!s.LanguageMatches)
+        {
+            return (GameApi.T("AgentTranslationBridge.LanguageMismatch", s.PackLanguage ?? "?", s.GameLanguage ?? "?"), GameApi.T("AgentTranslationBridge.SimpleNextLanguage"));
+        }
+        var total = s.Counts.Values.Sum();
+        var effective = s.Counts[Ok] + s.Counts[OkExtended];
+        return effective >= total
+            ? (GameApi.T("AgentTranslationBridge.SimpleAllOk", total), GameApi.T("AgentTranslationBridge.SimpleNextMore"))
+            : (GameApi.T("AgentTranslationBridge.SimpleSomeProblems", effective, total, total - effective), GameApi.T("AgentTranslationBridge.SimpleNextAdvanced"));
+    }
+
     public IEnumerable<string> StatusLines()
     {
         if (_busy)

@@ -26,15 +26,6 @@ namespace AgentTranslation.Core
         public bool Accepted => Rejects.Count == 0;
     }
 
-    /// <summary>Script of the target language; decides which wrong-script characters are rejected.</summary>
-    public enum TargetScript
-    {
-        /// <summary>ChineseSimplified: Traditional-only characters are rejected.</summary>
-        Simplified,
-        /// <summary>ChineseTraditional (Taiwan): Simplified-only characters are rejected.</summary>
-        Traditional,
-    }
-
     public sealed class ValidatorOptions
     {
         /// <summary>Proper nouns allowed to stay identical to the source (case-insensitive).</summary>
@@ -97,7 +88,7 @@ namespace AgentTranslation.Core
                     outcome.Rejects.Add(new ValidationIssue("simplified_chars", "Contains Simplified characters: " + string.Join("", simplified.Distinct()) + ". Use Traditional characters (Taiwan usage)."));
                 }
             }
-            else
+            else if (options.Script == TargetScript.Simplified)
             {
                 var traditional = TraditionalChars.FindIn(stripped);
                 if (traditional.Count > 0)
@@ -106,24 +97,65 @@ namespace AgentTranslation.Core
                 }
             }
 
-            if (string.Equals(text.Trim(), source.Trim(), StringComparison.Ordinal) && source.Any(IsAsciiLetter) && !options.ProperNounWhitelist.Contains(source.Trim()))
+            var forbidden = stripped.Where(c => Scripts.IsForbidden(options.Script, c)).Distinct().ToList();
+            if (forbidden.Count > 0)
             {
-                outcome.Flags.Add(new ValidationIssue("identical_to_source", "Translation equals the source and contains Latin letters; add proper nouns to the whitelist, otherwise translate it."));
+                outcome.Rejects.Add(new ValidationIssue("wrong_script", "Contains letters of another script that this language never uses: " + new string(forbidden.Take(8).ToArray()) + "."));
+            }
+            var foreign = stripped.Where(c => Scripts.IsForeign(options.Script, c)).Distinct().ToList();
+            if (foreign.Count > 0)
+            {
+                outcome.Flags.Add(new ValidationIssue("foreign_script", "Contains letters of another script: " + new string(foreign.Take(8).ToArray()) + ". Check that everything is translated."));
             }
 
-            var srcLen = Tokens.StripTokens(source).Trim().Length;
-            var dstLen = stripped.Trim().Length;
-            if (srcLen >= 12)
+            if (string.Equals(text.Trim(), source.Trim(), StringComparison.Ordinal) && source.Any(char.IsLetter) && !options.ProperNounWhitelist.Contains(source.Trim()))
             {
-                var ratio = (double)dstLen / srcLen;
-                if (ratio < 0.12 || ratio > 1.6)
+                outcome.Flags.Add(new ValidationIssue("identical_to_source", "Translation equals the source; add proper nouns to the whitelist, otherwise translate it."));
+            }
+            else if (!Scripts.IsChinese(options.Script) && options.Script != TargetScript.Latin
+                && Tokens.StripTokens(source).Count(char.IsLetter) >= 3 && !stripped.Any(c => Scripts.IsOwnLetter(options.Script, c)))
+            {
+                outcome.Flags.Add(new ValidationIssue("no_target_script", "The translation has no letters of the target script; it may be untranslated."));
+            }
+
+            var srcText = Tokens.StripTokens(source).Trim();
+            var dstText = stripped.Trim();
+            var bothChinese = Scripts.IsChinese(options.Script) && !srcText.Any(Scripts.IsWide);
+            if (bothChinese)
+            {
+                // Latin source -> Chinese target: the original rule, tuned on real data.
+                var srcLen = srcText.Length;
+                var dstLen = dstText.Length;
+                if (srcLen >= 12)
                 {
-                    outcome.Flags.Add(new ValidationIssue("length_anomaly", "Unusual translation/source length ratio (" + ratio.ToString("0.00") + ")."));
+                    var ratio = (double)dstLen / srcLen;
+                    if (ratio < 0.12 || ratio > 1.6)
+                    {
+                        outcome.Flags.Add(new ValidationIssue("length_anomaly", "Unusual translation/source length ratio (" + ratio.ToString("0.00") + ")."));
+                    }
+                }
+                else if (dstLen > srcLen * 3 + 6)
+                {
+                    outcome.Flags.Add(new ValidationIssue("length_anomaly", "Translation is too long for a short source."));
                 }
             }
-            else if (dstLen > srcLen * 3 + 6)
+            else
             {
-                outcome.Flags.Add(new ValidationIssue("length_anomaly", "Translation is too long for a short source."));
+                // Any other pair: compare widths, where a Han/kana/Hangul character counts as 2.5 Latin letters.
+                var srcLen = Scripts.WeightedLength(srcText);
+                var dstLen = Scripts.WeightedLength(dstText);
+                if (srcLen >= 12)
+                {
+                    var ratio = dstLen / srcLen;
+                    if (ratio < 0.25 || ratio > 3.5)
+                    {
+                        outcome.Flags.Add(new ValidationIssue("length_anomaly", "Unusual translation/source length ratio (" + ratio.ToString("0.00") + ")."));
+                    }
+                }
+                else if (dstLen > srcLen * 4 + 10)
+                {
+                    outcome.Flags.Add(new ValidationIssue("length_anomaly", "Translation is too long for a short source."));
+                }
             }
 
             return outcome;
@@ -141,7 +173,7 @@ namespace AgentTranslation.Core
             // Run the general checks with a pseudo-source that holds exactly the translation's braces, so they pass the
             // source comparison and are checked against the argument count below instead.
             var outcome = Validate(string.Join(" ", braces), text, options);
-            outcome.Flags.RemoveAll(f => f.Code == "identical_to_source" || f.Code == "length_anomaly");
+            outcome.Flags.RemoveAll(f => f.Code == "identical_to_source" || f.Code == "length_anomaly" || f.Code == "no_target_script");
             if (!outcome.Accepted && outcome.Rejects.Any(r => r.Code == "empty" || r.Code == "too_long"))
             {
                 return outcome;
@@ -180,8 +212,6 @@ namespace AgentTranslation.Core
             }
         }
 
-        private static bool IsAsciiLetter(char c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-
         private static string? FindInvalidXmlChar(string text)
         {
             for (int i = 0; i < text.Length; i++)
@@ -212,6 +242,9 @@ namespace AgentTranslation.Core
             + "应废库开弃张弯归当录彻忆忧怀态总恋恶悬惊惧惨惯戏战扑执扩扫扬扰抚抛抢护报担拟拢拣拥拦拧拨择挡挤挥损捡换掳掷搀摄摆摇摊撵擞攒敌敛数斋断旧时旷昙显晒晓晕暂机杀杂权条来杨极构枢枣枪栋栏树样档桥桨梦检棂椭楼榄樱欢欧歼殴毕毙汇汉汤沟没泼泽洁浅测济浑浓涛涝润涨渊渐渔渗湾湿溃满滤滥滨滩潆灭灯灵灾灿炉点炼烂烛烦烧热焕爱爷牍牵犹狈狮独狭狱猎献获环现玛琐瑶瓒电畅疗疮疯瘫瘾监盘睁矫码砖础硕确碍礼祷祸离秃秆积称种稳穷窃窍窑窜窝竖竞笔笼筛筹签简粮紧纠红纤约级纪纫纬纯纱纲纳纵纷纸纹纺线练组细织终绍经绑结绕绘给络绝统绢绣继绩绪续绳维绵综绽绿缀缆缓编缘缚缝缠缩缴罗罚罢羁翘联聪肃肠肤肾肿胀胁胆胶脏脑脸腻舆舰舱艰艺节芜苇苍苏茎荐荡荣荤药莱莲获萝萤营萧萨蓝蔷虏虑虫虽虾蚀蚁蚂蛮蝇衅补衬袄袜袭装裤见观规觅视览觉誉计订认讨让训议讯记讲讳许论设访诀证评识诈诉诊词译试诗诚话诞询该详诧诫语误诱说请诸诺读课谁调谅谈谊谋谍谎谐谓谜谢谣谦谨谱贝贞负贡财责贤败账货质贩贪贫购贯贱贴贵贷贸费贺贼资赋赌赏赔赖赚赛赞赠赢赵赶趋跃践踪躏车轨轩转轮软轰轴轻载较辅辆辈辉辐辑输辖辞边辽达迁过迈运还这进远违连迟选逊递逻遗遥邓邮邻郑酱酿释针钓钙钟钢钥钦钩钮钱钻铁铃铅铜铭铺链销锁锄锅锈锋锐错锡锦键锯锻镇镜长门闪闭问闯闲间闷闸闹闻阀阁阅队阳阴阵阶际陆陈险随隐隶难雾页顶项顺须顽顾顿预领颇频颗题颜额风飘飞饥饭饮饰饱饲饿馆马驭驱驳驶驻驾骂验骑骗骚鱼鲜鸟鸡鸣鸭鸽鹅鹰麦齐齿龄龙龟";
 
         private static HashSet<char> Set = new HashSet<char>(Chars);
+
+        /// <summary>Whether a character is in the small built-in fallback list (not the full set installed later).</summary>
+        public static bool InBuiltin(char c) => Chars.IndexOf(c) >= 0;
 
         /// <summary>
         /// Replaces the built-in list with a full set. The server builds it from OpenCC STCharacters: a character is

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+  <!-- Small tab button in the bottom bar that opens the Agent Translation settings page. Can be hidden on that page. -->
+  <MainButtonDef>
+    <defName>AgentTranslation_Settings</defName>
+    <label>agent translation</label>
+    <description>Open the Agent Translation settings: pack language, translation status and a short how-to.</description>
+    <workerClass>AgentTranslation.Bridge.MainButtonWorker_AgentTranslation</workerClass>
+    <order>95</order>
+    <minimized>true</minimized>
+    <iconPath>AgentTranslation/QuickButton</iconPath>
+    <validWithoutMap>true</validWithoutMap>
+    <canBeTutorDenied>false</canBeTutorDenied>
+  </MainButtonDef>
+</Defs>

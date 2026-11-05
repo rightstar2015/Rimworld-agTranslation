@@ -1,6 +1,6 @@
 # RimWorld Agent Translation
 
-Lets any MCP-capable AI agent produce Chinese translation packs for RimWorld 1.7 mods, in Simplified Chinese (default) or Traditional Chinese (Taiwan usage).
+Lets any MCP-capable AI agent translate RimWorld 1.7 mods from any source language into any language the game ships. Simplified and Traditional Chinese, Japanese, Korean and English are fully supported; the other game languages are experimental (format checks only).
 
 This tool never calls an AI service and needs no API key. The agent you already use does the translating; this tool scans mods, extracts text, supplies context, translation memory and glossary, validates results and writes a standard translation pack. Original mods are never modified.
 
@@ -8,9 +8,9 @@ This tool never calls an AI service and needs no API key. The agent you already 
 
 ## What it does
 
-- Finds untranslated text (Keyed and DefInjected, with Defs inheritance resolved). Existing translations for the target language, including those from translation patch mods, count as translated and are never overwritten.
-- Gives the agent memory with every batch: official game translations and other mods' existing translations of the same English, so wording stays consistent with what you already have.
-- Validates every submission: placeholders, markup and newlines must match; characters of the other Chinese script are rejected; empty, untranslated and oddly sized results are flagged.
+- Finds untranslated text (Keyed and DefInjected, with Defs inheritance resolved). The source is English when the mod has it; otherwise the mod's own language, so a Chinese-only mod can be translated into English, for example. Existing translations for the target language, including those from translation patch mods, count as translated and are never overwritten.
+- Gives the agent memory with every batch: the game's official translation of the target language and other mods' existing translations of the same source text, so wording stays consistent with what you already have.
+- Validates every submission: placeholders, markup and newlines must match; wrong-script text is rejected (the other Chinese script, Hangul in Japanese, kana in Korean) or flagged; empty, untranslated and oddly sized results are flagged.
 - Writes a separate pack mod (`!AgentTranslation_Pack`) that loads after the translated mods. Deleting it removes every translation.
 - Traditional mode can also reuse existing Simplified translations converted with OpenCC (Apache-2.0 dictionaries, embedded).
 
@@ -18,7 +18,7 @@ This tool never calls an AI service and needs no API key. The agent you already 
 
 1. Optional but recommended: enable the `Agent Translation Bridge` mod (any position).
 2. Connect `rwat` to your MCP client (see below). It finds the game, the Workshop folder and your mod list by itself.
-3. Set the game language to Simplified or Traditional Chinese, then ask your agent to translate your active mods and build the pack. Restart the game and enable `Agent Translation Pack`.
+3. Set the game language (the pack follows it by default), then ask your agent to translate your active mods and build the pack. Restart the game and enable `Agent Translation Pack`.
 
 No configuration file needs editing for this. Player guides: [English](docs/guide/PLAYER_GUIDE.en.md) · [简体中文](docs/guide/PLAYER_GUIDE.zh-CN.md) · [繁體中文](docs/guide/PLAYER_GUIDE.zh-TW.md) · [日本語](docs/guide/PLAYER_GUIDE.ja.md) · [한국어](docs/guide/PLAYER_GUIDE.ko.md).
 
@@ -66,7 +66,7 @@ Tools: `get_environment`, `list_mods`, `scan_mod`, `get_batch`, `submit_translat
 
 ## Optional in-game bridge
 
-`Agent Translation Bridge` is a small companion mod. After the game loads it checks which pack translations are actually in effect (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed texts without restarting (experimental, off by default). Its settings page also holds your rwat switches (pack language, keys used in code, auto-adopt), so players never need to open `config.json`. It only uses the `AgentTranslation` folder inside RimWorld's data folder (next to `Saves` and `Config`) and opens no network port.
+`Agent Translation Bridge` is a small companion mod. After the game loads it checks which pack translations are actually in effect (and which ones another mod overrides) and can reload Keyed texts without restarting (experimental, off by default). Its settings page has a simple mode (a three-step how-to, the status with a next step, the pack language) and an advanced mode (every switch and the full report), and holds your rwat switches, so players never need to open `config.json`. It opens from Options > Mod settings, from an icon in the bottom-right icon row (patched in through Harmony when Harmony is installed; Harmony is optional) or from a small tab button in the bottom bar; either button can be hidden. Bridge UI languages: English, Simplified and Traditional Chinese, Japanese, Korean. It only uses the `AgentTranslation` folder inside RimWorld's data folder (next to `Saves` and `Config`) and opens no network port.
 
 ```bash
 dotnet build src/AgentTranslation.Bridge -p:RimWorldDir="C:\path\to\RimWorld"
@@ -100,7 +100,7 @@ rwat build
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `target_language` | `auto` | `auto` follows the game language (Simplified when the game is not in Chinese); or `ChineseSimplified` / `ChineseTraditional` |
+| `target_language` | `auto` | `auto` follows the game language; or a language folder name such as `ChineseSimplified`, `ChineseTraditional`, `Japanese`, `Korean`, `English`, `German` (any of the 29 languages the game ships) |
 | `pack_output_dir` | game `Mods` folder | Where the pack folder is written (`RWAT_PACK_OUTPUT_DIR` overrides) |
 | `simplified_auto_adopt.enabled` | `false` | Lets existing Simplified translations be adopted automatically under the conditions you set |
 | `code_keys.enabled` | `false` | Also offers keys that mod code uses but no language file defines (the game shows the raw key). They have no English source, so the agent infers the text; each one is flagged for review |

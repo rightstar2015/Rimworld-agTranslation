@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <AgentTranslationBridge.Title>Agent Translation</AgentTranslationBridge.Title>
+  <AgentTranslationBridge.ModeSimple>简单模式</AgentTranslationBridge.ModeSimple>
+  <AgentTranslationBridge.ModeAdvanced>进阶模式</AgentTranslationBridge.ModeAdvanced>
+  <AgentTranslationBridge.ModeSimpleTip>只显示大多数玩家需要的内容。切换到进阶模式可看到全部选项和完整报告。</AgentTranslationBridge.ModeSimpleTip>
+  <AgentTranslationBridge.ModeAdvancedTip>全部选项、游戏内检查和完整报告。</AgentTranslationBridge.ModeAdvancedTip>
+  <AgentTranslationBridge.HowToHeader>使用方法</AgentTranslationBridge.HowToHeader>
+  <AgentTranslationBridge.HowTo1>1. 在你的 AI 工具（例如 Claude 应用）里连接 rwat。做法见 README。</AgentTranslationBridge.HowTo1>
+  <AgentTranslationBridge.HowTo2>2. 对 AI 助手说：“帮我翻译已启用的模组，然后建置翻译包。”</AgentTranslationBridge.HowTo2>
+  <AgentTranslationBridge.HowTo3>3. 重启游戏，在模组列表里启用“Agent Translation Pack”，并放在最后。</AgentTranslationBridge.HowTo3>
+  <AgentTranslationBridge.StatusHeader>当前状态</AgentTranslationBridge.StatusHeader>
+  <AgentTranslationBridge.NextStep>下一步：{0}</AgentTranslationBridge.NextStep>
+  <AgentTranslationBridge.SimpleNextWait>进入主菜单或载入存档后会自动检查。</AgentTranslationBridge.SimpleNextWait>
+  <AgentTranslationBridge.SimpleNoPack>还没有启用的翻译包。</AgentTranslationBridge.SimpleNoPack>
+  <AgentTranslationBridge.SimpleNextTranslate>按上面的第 2、3 步操作。</AgentTranslationBridge.SimpleNextTranslate>
+  <AgentTranslationBridge.SimpleNextLanguage>把下面的翻译包语言改成游戏语言，请 AI 助手重新建置翻译包，再重启游戏。</AgentTranslationBridge.SimpleNextLanguage>
+  <AgentTranslationBridge.SimpleAllOk>翻译包的 {0} 条译文全部生效。</AgentTranslationBridge.SimpleAllOk>
+  <AgentTranslationBridge.SimpleNextMore>想翻译更多模组，请 AI 助手继续翻译并重新建置翻译包，然后重启游戏。</AgentTranslationBridge.SimpleNextMore>
+  <AgentTranslationBridge.SimpleSomeProblems>{1} 条译文中有 {0} 条生效，{2} 条未生效（通常是其他模组或汉化补丁已翻译了同一段文字）。</AgentTranslationBridge.SimpleSomeProblems>
+  <AgentTranslationBridge.SimpleNextAdvanced>切换到进阶模式可查看是哪些模组。如果游戏里文字看起来没问题，就不需要处理。</AgentTranslationBridge.SimpleNextAdvanced>
+  <AgentTranslationBridge.ButtonsHeader>快捷按钮</AgentTranslationBridge.ButtonsHeader>
+  <AgentTranslationBridge.ShowCornerButton>在右下角图标列显示按钮</AgentTranslationBridge.ShowCornerButton>
+  <AgentTranslationBridge.ShowCornerButtonTip>放在游戏自带开关（区域、美观度……）旁边的小图标，点一下打开本页。</AgentTranslationBridge.ShowCornerButtonTip>
+  <AgentTranslationBridge.NeedsHarmony>（需要 Harmony 模组）</AgentTranslationBridge.NeedsHarmony>
+  <AgentTranslationBridge.ShowTabButton>在底部分页栏显示按钮</AgentTranslationBridge.ShowTabButton>
+  <AgentTranslationBridge.ShowTabButtonTip>屏幕底部“菜单”旁边的小分页按钮，点一下打开本页。</AgentTranslationBridge.ShowTabButtonTip>
+  <AgentTranslationBridge.Immediate>这些开关立即生效。</AgentTranslationBridge.Immediate>
+  <AgentTranslationBridge.CheckHeader>游戏内检查（立即生效）</AgentTranslationBridge.CheckHeader>
+  <AgentTranslationBridge.ReportHeader>完整报告</AgentTranslationBridge.ReportHeader>
   <AgentTranslationBridge.ReportEnabled>生成运行时报告</AgentTranslationBridge.ReportEnabled>
   <AgentTranslationBridge.ReportEnabledTip>游戏加载完成后，检查翻译包中哪些译文实际生效，并把结果写给 rwat 工具。</AgentTranslationBridge.ReportEnabledTip>
   <AgentTranslationBridge.ReloadEnabled>实验性：允许不重启游戏重新加载 Keyed 译文</AgentTranslationBridge.ReloadEnabled>
@@ -18,11 +45,11 @@
   <AgentTranslationBridge.ProblemRow>{0}：被覆盖 {1}，被更改 {2}，未生效 {3}</AgentTranslationBridge.ProblemRow>
   <AgentTranslationBridge.ReloadResult>Keyed 重新加载：已套用 {0} 条。</AgentTranslationBridge.ReloadResult>
   <AgentTranslationBridge.ReloadDisabled>Keyed 重新加载已关闭。</AgentTranslationBridge.ReloadDisabled>
-  <AgentTranslationBridge.ToolSettings>翻译工具设置（rwat）</AgentTranslationBridge.ToolSettings>
-  <AgentTranslationBridge.LanguageHeader>翻译包语言：</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.ToolSettings>翻译工具进阶设置（rwat）</AgentTranslationBridge.ToolSettings>
+  <AgentTranslationBridge.LanguageHeader>翻译包语言</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.LanguageTip>AI 助手要翻译成的语言。大多数玩家选“跟随游戏语言”即可。</AgentTranslationBridge.LanguageTip>
   <AgentTranslationBridge.Language.auto>跟随游戏语言</AgentTranslationBridge.Language.auto>
-  <AgentTranslationBridge.Language.ChineseSimplified>简体中文</AgentTranslationBridge.Language.ChineseSimplified>
-  <AgentTranslationBridge.Language.ChineseTraditional>繁体中文</AgentTranslationBridge.Language.ChineseTraditional>
+  <AgentTranslationBridge.LanguageExperimental>（实验性）</AgentTranslationBridge.LanguageExperimental>
   <AgentTranslationBridge.CodeKeys>补上模组漏定义的键</AgentTranslationBridge.CodeKeys>
   <AgentTranslationBridge.CodeKeysTip>有些模组的界面连英文都显示成键名（例如 Some.Key.Name）。开启后 AI 助手会根据键名推测译文，每条都会标记为推测。</AgentTranslationBridge.CodeKeysTip>
   <AgentTranslationBridge.AutoAdopt>繁体模式：自动采用现成的简体译文</AgentTranslationBridge.AutoAdopt>
@@ -32,4 +59,6 @@
   <AgentTranslationBridge.ToolSettingsMissing>找不到 rwat 的设置文件（{0}）。请先运行一次 rwat。</AgentTranslationBridge.ToolSettingsMissing>
   <AgentTranslationBridge.ToolSettingsError>无法读取或写入设置文件（{0}）。</AgentTranslationBridge.ToolSettingsError>
   <AgentTranslationBridge.ToolSettingsCustomDir>桥接文件夹由 RWAT_BRIDGE_DIR 指定，无法找到 rwat 的设置文件，请直接编辑 config.json。</AgentTranslationBridge.ToolSettingsCustomDir>
+  <AgentTranslationBridge.ConfigPath>设置文件：{0}</AgentTranslationBridge.ConfigPath>
+  <AgentTranslationBridge.QuickButtonTip>Agent Translation：设置与翻译状态</AgentTranslationBridge.QuickButtonTip>
 </LanguageData>

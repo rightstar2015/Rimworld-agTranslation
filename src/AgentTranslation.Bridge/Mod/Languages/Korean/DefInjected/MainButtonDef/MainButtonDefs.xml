@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <AgentTranslation_Settings.label>AI 번역</AgentTranslation_Settings.label>
+  <AgentTranslation_Settings.description>Agent Translation 설정을 엽니다: 번역 팩 언어, 번역 상태, 간단한 사용법.</AgentTranslation_Settings.description>
+</LanguageData>

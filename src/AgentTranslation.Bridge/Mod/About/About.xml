@@ -6,9 +6,14 @@
   <supportedVersions>
     <li>1.7</li>
   </supportedVersions>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+  </loadAfter>
   <description>Optional companion of the Agent Translation pack (rwat).
 
-Reports which pack translations are actually in effect in the game (and which ones another mod overrides), shows the result under Options > Mod settings, and can reload Keyed translations without restarting (experimental, off by default).
+Settings page with a simple mode (how-to, translation status, pack language) and an advanced mode (all options and the full report). Open it from Options > Mod settings, the bottom-right icon row (needs Harmony) or the small tab button in the bottom bar; both buttons can be hidden.
 
-Reads and writes only its own folder AgentTranslation\bridge inside the game's data folder (next to Saves and Config). Opens no network port. Never changes other mods.</description>
+Reports which pack translations are actually in effect in the game (and which ones another mod overrides), and can reload Keyed translations without restarting (experimental, off by default).
+
+Reads and writes only its own folder AgentTranslation inside the game's data folder (next to Saves and Config). Opens no network port. Never changes other mods. Harmony is optional: without it only the bottom-right icon is unavailable.</description>
 </ModMetaData>

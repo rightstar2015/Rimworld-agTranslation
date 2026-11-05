@@ -94,6 +94,7 @@ public class PathSandboxTests
     }
 }
 
+[Collection("CharSets")]
 public class ValidatorTests
 {
     private static readonly ValidatorOptions Tc = new() { Script = TargetScript.Traditional };
@@ -241,17 +242,21 @@ public class WriterTests
     }
 }
 
+[Collection("CharSets")]
 public class SimplifiedListTests
 {
     /// <summary>常見於繁體中文、也與簡體同形的字，不能出現在簡體字清單中。</summary>
     [Fact]
     public void SharedCharacters_NotFlagged()
     {
+        // Checks the built-in fallback list only: the full OpenCC set (installed when the server starts) does count some
+        // of these as Simplified-only (e.g. 术 -> 術), which is correct there.
         const string shared = "修械器示存源牧志斗郁涂术杰庄厂广据撑柜横毁污温烟猫痒痴着筑脱虚静黄户网胜适气画腊盖脚挂蜡";
-        Assert.Empty(SimplifiedChars.FindIn(shared));
+        Assert.Empty(shared.Where(SimplifiedChars.InBuiltin));
     }
 }
 
+[Collection("CharSets")]
 public class ChineseConversionTests
 {
     private static readonly AgentTranslation.Server.ChineseResources Zh =

@@ -49,11 +49,16 @@ public static class ScanCache
         public List<NoteDto> Notes { get; set; } = new();
     }
 
-    public static string Fingerprint(GameEnvironment env, InstalledMod mod)
+    /// <summary>
+    /// Changes when anything the extraction depends on changes: game version and assembly, the active mod list, this mod's
+    /// Defs, Languages and Assemblies, and the target language (it decides which language folder is the Keyed source).
+    /// </summary>
+    public static string Fingerprint(GameEnvironment env, InstalledMod mod, string targetLanguage)
     {
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         void Add(string s) => sha.AppendData(Encoding.UTF8.GetBytes(s + "\n"));
         Add(FormatVersion);
+        Add("target:" + targetLanguage);
         Add(env.VersionFull);
         AddFile(Add, Path.Combine(env.GameDir, "Assembly-CSharp.dll"));
         AddFile(Add, Path.Combine(env.GameDir, "RimWorldWin64_Data", "Managed", "Assembly-CSharp.dll"));
@@ -67,7 +72,7 @@ public static class ScanCache
         foreach (var folder in env.LoadFoldersFor(mod))
         {
             Add("folder:" + Path.GetRelativePath(mod.RootDir, folder));
-            foreach (var sub in new[] { "Defs", Path.Combine("Languages", "English"), "Assemblies" })
+            foreach (var sub in new[] { "Defs", "Languages", "Assemblies" })
             {
                 var dir = Path.Combine(folder, sub);
                 if (!Directory.Exists(dir))

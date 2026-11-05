@@ -259,7 +259,7 @@ public sealed class ChineseResources
 
     private static bool IsCjk(char c) => c >= 0x3400 && c <= 0x9FFF;
 
-    private static IEnumerable<(string, Func<Stream>)> TarFiles(string tarPath)
+    internal static IEnumerable<(string, Func<Stream>)> TarFiles(string tarPath)
     {
         using var fs = File.OpenRead(tarPath);
         using var reader = new TarReader(fs);

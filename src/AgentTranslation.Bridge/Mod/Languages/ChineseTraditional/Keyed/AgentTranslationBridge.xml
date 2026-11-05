@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <AgentTranslationBridge.Title>Agent Translation</AgentTranslationBridge.Title>
+  <AgentTranslationBridge.ModeSimple>簡單模式</AgentTranslationBridge.ModeSimple>
+  <AgentTranslationBridge.ModeAdvanced>進階模式</AgentTranslationBridge.ModeAdvanced>
+  <AgentTranslationBridge.ModeSimpleTip>只顯示大多數玩家需要的內容。切換到進階模式可看到全部選項和完整報告。</AgentTranslationBridge.ModeSimpleTip>
+  <AgentTranslationBridge.ModeAdvancedTip>全部選項、遊戲內檢查和完整報告。</AgentTranslationBridge.ModeAdvancedTip>
+  <AgentTranslationBridge.HowToHeader>使用方法</AgentTranslationBridge.HowToHeader>
+  <AgentTranslationBridge.HowTo1>1. 在你的 AI 工具（例如 Claude 應用程式）裡連上 rwat。做法見 README。</AgentTranslationBridge.HowTo1>
+  <AgentTranslationBridge.HowTo2>2. 對 AI 助理說：「幫我翻譯啟用中的模組，然後建置翻譯包。」</AgentTranslationBridge.HowTo2>
+  <AgentTranslationBridge.HowTo3>3. 重開遊戲，在模組清單啟用「Agent Translation Pack」，並放在最後。</AgentTranslationBridge.HowTo3>
+  <AgentTranslationBridge.StatusHeader>目前狀態</AgentTranslationBridge.StatusHeader>
+  <AgentTranslationBridge.NextStep>下一步：{0}</AgentTranslationBridge.NextStep>
+  <AgentTranslationBridge.SimpleNextWait>進入主選單或載入存檔後會自動檢查。</AgentTranslationBridge.SimpleNextWait>
+  <AgentTranslationBridge.SimpleNoPack>還沒有啟用的翻譯包。</AgentTranslationBridge.SimpleNoPack>
+  <AgentTranslationBridge.SimpleNextTranslate>照上面的第 2、3 步操作。</AgentTranslationBridge.SimpleNextTranslate>
+  <AgentTranslationBridge.SimpleNextLanguage>把下面的翻譯包語言改成遊戲語言，請 AI 助理重新建置翻譯包，再重開遊戲。</AgentTranslationBridge.SimpleNextLanguage>
+  <AgentTranslationBridge.SimpleAllOk>翻譯包的 {0} 條譯文全部生效。</AgentTranslationBridge.SimpleAllOk>
+  <AgentTranslationBridge.SimpleNextMore>想翻譯更多模組，請 AI 助理繼續翻譯並重新建置翻譯包，然後重開遊戲。</AgentTranslationBridge.SimpleNextMore>
+  <AgentTranslationBridge.SimpleSomeProblems>{1} 條譯文中有 {0} 條生效，{2} 條沒生效（通常是其他模組或翻譯補丁已經翻了同一段文字）。</AgentTranslationBridge.SimpleSomeProblems>
+  <AgentTranslationBridge.SimpleNextAdvanced>切換到進階模式可查看是哪些模組。如果遊戲裡文字看起來沒問題，就不需要處理。</AgentTranslationBridge.SimpleNextAdvanced>
+  <AgentTranslationBridge.ButtonsHeader>快速按鈕</AgentTranslationBridge.ButtonsHeader>
+  <AgentTranslationBridge.ShowCornerButton>在右下角圖示列顯示按鈕</AgentTranslationBridge.ShowCornerButton>
+  <AgentTranslationBridge.ShowCornerButtonTip>放在遊戲內建開關（區域、美觀度……）旁邊的小圖示，按一下打開這一頁。</AgentTranslationBridge.ShowCornerButtonTip>
+  <AgentTranslationBridge.NeedsHarmony>（需要 Harmony 模組）</AgentTranslationBridge.NeedsHarmony>
+  <AgentTranslationBridge.ShowTabButton>在底部分頁列顯示按鈕</AgentTranslationBridge.ShowTabButton>
+  <AgentTranslationBridge.ShowTabButtonTip>畫面底部「選單」旁邊的小分頁按鈕，按一下打開這一頁。</AgentTranslationBridge.ShowTabButtonTip>
+  <AgentTranslationBridge.Immediate>這些開關立即生效。</AgentTranslationBridge.Immediate>
+  <AgentTranslationBridge.CheckHeader>遊戲內檢查（立即生效）</AgentTranslationBridge.CheckHeader>
+  <AgentTranslationBridge.ReportHeader>完整報告</AgentTranslationBridge.ReportHeader>
   <AgentTranslationBridge.ReportEnabled>產生執行期報告</AgentTranslationBridge.ReportEnabled>
   <AgentTranslationBridge.ReportEnabledTip>遊戲載入完成後，檢查翻譯包中哪些譯文實際生效，並把結果寫給 rwat 工具。</AgentTranslationBridge.ReportEnabledTip>
   <AgentTranslationBridge.ReloadEnabled>實驗性：允許不重開遊戲重新載入 Keyed 譯文</AgentTranslationBridge.ReloadEnabled>
@@ -18,11 +45,11 @@
   <AgentTranslationBridge.ProblemRow>{0}：被覆蓋 {1}，被更改 {2}，未生效 {3}</AgentTranslationBridge.ProblemRow>
   <AgentTranslationBridge.ReloadResult>Keyed 重新載入：已套用 {0} 筆。</AgentTranslationBridge.ReloadResult>
   <AgentTranslationBridge.ReloadDisabled>Keyed 重新載入已關閉。</AgentTranslationBridge.ReloadDisabled>
-  <AgentTranslationBridge.ToolSettings>翻譯工具設定（rwat）</AgentTranslationBridge.ToolSettings>
-  <AgentTranslationBridge.LanguageHeader>翻譯包語言：</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.ToolSettings>翻譯工具進階設定（rwat）</AgentTranslationBridge.ToolSettings>
+  <AgentTranslationBridge.LanguageHeader>翻譯包語言</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.LanguageTip>AI 助理要翻成的語言。大多數玩家選「跟著遊戲語言」就好。</AgentTranslationBridge.LanguageTip>
   <AgentTranslationBridge.Language.auto>跟著遊戲語言</AgentTranslationBridge.Language.auto>
-  <AgentTranslationBridge.Language.ChineseSimplified>簡體中文</AgentTranslationBridge.Language.ChineseSimplified>
-  <AgentTranslationBridge.Language.ChineseTraditional>繁體中文</AgentTranslationBridge.Language.ChineseTraditional>
+  <AgentTranslationBridge.LanguageExperimental>（實驗性）</AgentTranslationBridge.LanguageExperimental>
   <AgentTranslationBridge.CodeKeys>補上模組漏定義的鍵</AgentTranslationBridge.CodeKeys>
   <AgentTranslationBridge.CodeKeysTip>有些模組的介面連英文都顯示成鍵名（例如 Some.Key.Name）。開啟後 AI 助理會依鍵名推測譯文，每筆都會標示為推測。</AgentTranslationBridge.CodeKeysTip>
   <AgentTranslationBridge.AutoAdopt>繁中模式：自動採用現成的簡中譯文</AgentTranslationBridge.AutoAdopt>
@@ -32,4 +59,6 @@
   <AgentTranslationBridge.ToolSettingsMissing>找不到 rwat 的設定檔（{0}）。請先執行一次 rwat。</AgentTranslationBridge.ToolSettingsMissing>
   <AgentTranslationBridge.ToolSettingsError>無法讀取或寫入設定檔（{0}）。</AgentTranslationBridge.ToolSettingsError>
   <AgentTranslationBridge.ToolSettingsCustomDir>橋接資料夾由 RWAT_BRIDGE_DIR 指定，找不到 rwat 的設定檔，請直接編輯 config.json。</AgentTranslationBridge.ToolSettingsCustomDir>
+  <AgentTranslationBridge.ConfigPath>設定檔：{0}</AgentTranslationBridge.ConfigPath>
+  <AgentTranslationBridge.QuickButtonTip>Agent Translation：設定與翻譯狀態</AgentTranslationBridge.QuickButtonTip>
 </LanguageData>

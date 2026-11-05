@@ -33,7 +33,8 @@ public sealed class GlossaryEntry
 public sealed class UserGlossary
 {
     public const int MaxEntries = 5000;
-    private static readonly Regex EnglishTerm = new(@"^[A-Za-z0-9][A-Za-z0-9 '\-\.]{0,63}$", RegexOptions.CultureInvariant);
+    /// <summary>A source term: letters of any script, digits, spaces, ' - . (sources need not be English).</summary>
+    private static readonly Regex EnglishTerm = new(@"^[\p{L}\p{N}][\p{L}\p{M}\p{N} '\-\.]{0,63}$", RegexOptions.CultureInvariant);
 
     /// <summary>Taiwan forms OpenCC does not produce. Only a few verified terms; users add the rest.</summary>
     public static readonly IReadOnlyList<GlossaryEntry> Builtin = new[]
@@ -90,7 +91,7 @@ public sealed class UserGlossary
         }
         if (!TargetLanguages.IsValid(language))
         {
-            return "language must be ChineseSimplified or ChineseTraditional.";
+            return "language must be a language folder name (" + string.Join(", ", TargetLanguages.All.Select(l => l.Folder)) + ").";
         }
         if (kind == "s2t" && language != TargetLanguages.Traditional)
         {
@@ -108,10 +109,12 @@ public sealed class UserGlossary
         {
             return "note must be at most 200 characters, without control characters.";
         }
-        var wrong = language == TargetLanguages.Traditional ? SimplifiedChars.FindIn(target) : TraditionalChars.FindIn(target);
+        var wrong = language == TargetLanguages.Traditional ? SimplifiedChars.FindIn(target)
+            : language == TargetLanguages.Simplified ? TraditionalChars.FindIn(target)
+            : target.Where(c => Scripts.IsForbidden(TargetLanguages.ScriptOf(language!), c)).ToList();
         if (wrong.Count > 0)
         {
-            return "target contains characters of the other script: " + string.Join("", wrong.Take(5));
+            return "target contains characters of the wrong script: " + string.Join("", wrong.Take(5));
         }
         if (kind == "s2t")
         {
@@ -123,7 +126,7 @@ public sealed class UserGlossary
         }
         else if (!EnglishTerm.IsMatch(source))
         {
-            return "en source may contain only letters, digits, spaces, ' - . (at most 64 characters).";
+            return "en source may contain only letters, digits, spaces, ' - . (at most 64 characters); despite the name, it may be in any source language.";
         }
         return null;
     }

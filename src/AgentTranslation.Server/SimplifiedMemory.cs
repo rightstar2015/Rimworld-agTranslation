@@ -131,6 +131,12 @@ public sealed class SimplifiedMemory
         _zh = zh;
     }
 
+    /// <summary>
+    /// Language of the collected translations: Simplified in Traditional mode (converted with OpenCC), otherwise the
+    /// target language itself (used unchanged). The class name stays from when only Chinese was supported.
+    /// </summary>
+    public string MemoryLanguage => _config.IsTraditional ? TargetLanguages.Simplified : _config.TargetLanguage;
+
     public int ProviderCount { get; private set; }
     public int RecordCount { get; private set; }
 
@@ -155,7 +161,7 @@ public sealed class SimplifiedMemory
             {
                 foreach (var dir in Directory.GetDirectories(languagesDir))
                 {
-                    if (!TargetLanguages.FolderMatches(Path.GetFileName(dir), TargetLanguages.Simplified))
+                    if (!TargetLanguages.FolderMatches(Path.GetFileName(dir), MemoryLanguage))
                     {
                         continue;
                     }
@@ -464,7 +470,9 @@ public sealed class SimplifiedMemory
             trust -= 5;
             signals.Add(new Reason("coverage_low", providerCoverage.ToString("P0")));
         }
-        var residual = ResidualEnglish.Matches(Tokens.StripTokens(sc)).Select(m => m.Value).Where(w => !_config.ProperNouns.Contains(w, StringComparer.OrdinalIgnoreCase)).ToList();
+        // Latin words are normal in Latin-script targets, so "English left over" only means something elsewhere.
+        var residual = TargetLanguages.ScriptOf(_config.TargetLanguage) == TargetScript.Latin ? new List<string>()
+            : ResidualEnglish.Matches(Tokens.StripTokens(sc)).Select(m => m.Value).Where(w => !_config.ProperNouns.Contains(w, StringComparer.OrdinalIgnoreCase)).ToList();
         var suspicious = false;
         if (LanguageFileReader.NormalizeEnglish(sc) == current)
         {
@@ -489,7 +497,7 @@ public sealed class SimplifiedMemory
             englishSuspect = true;
             reasons.Add(new Reason("key_as_english"));
         }
-        else if (e.Source.Any(c => c >= 0x3400 && c <= 0x9FFF))
+        else if (TargetLanguages.IsChinese(_config.TargetLanguage) && e.Source.Any(c => c >= 0x3400 && c <= 0x9FFF))
         {
             englishSuspect = true;
             reasons.Add(new Reason("chinese_in_english"));

@@ -21,6 +21,9 @@ public sealed class ModScan
     /// <summary>Entries whose source text is already written in the target language (e.g. a Chinese mod's Defs in Simplified mode).</summary>
     public HashSet<string> SourceInTarget { get; init; } = new(StringComparer.Ordinal);
 
+    /// <summary>Language folder the Keyed source texts were read from (English for most mods), or null when the mod has no Keyed.</summary>
+    public string? KeyedSourceLanguage => Notes.FirstOrDefault(n => n.Code == ModScanner.SourceLanguageNote)?.Detail;
+
     public IEnumerable<SourceEntry> Translatable => Entries.Where(e => !AlreadyTranslated.Contains(e.Id) && !Ambiguous.Contains(e.Id) && !SourceInTarget.Contains(e.Id));
 }
 
@@ -64,7 +67,7 @@ public sealed class ModScanner : IDisposable
             return cached;
         }
         var fresh = _forceFresh.Remove(mod.PackageId);
-        var fingerprint = ScanCache.Fingerprint(_env, mod);
+        var fingerprint = ScanCache.Fingerprint(_env, mod, _config.TargetLanguage);
         var extracted = fresh ? null : ScanCache.TryLoad(_config.WorkDir, mod.PackageId, fingerprint);
         if (extracted == null)
         {
@@ -112,9 +115,14 @@ public sealed class ModScanner : IDisposable
         var result = new ExtractionResult();
         var folders = _env.LoadFoldersFor(mod);
 
-        // Keyed (English)
+        // Keyed: English when the mod has it (and English is not the target), otherwise the mod's own language.
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var lang in new[] { "English" })
+        var keyedSource = KeyedSourceLanguage(mod);
+        if (keyedSource != null)
+        {
+            result.Notes.Add(new ScanNote(SourceLanguageNote, keyedSource));
+        }
+        foreach (var lang in keyedSource == null ? Array.Empty<string>() : new[] { keyedSource })
         {
             foreach (var (rel, full) in LoadFolderResolver.CollectFiles(mod.RootDir, folders, Path.Combine("Languages", lang, "Keyed")))
             {
@@ -175,6 +183,43 @@ public sealed class ModScanner : IDisposable
         final.Entries.AddRange(entries);
         final.Notes.AddRange(result.Notes);
         return final;
+    }
+
+    /// <summary>Note code that records which language folder the Keyed source texts came from (kept in the scan cache).</summary>
+    public const string SourceLanguageNote = "source_language";
+
+    /// <summary>
+    /// Language folder (full folder name as found in the mod) that holds the Keyed source texts: English unless English is
+    /// the target; otherwise the language with the most Keyed files that is not the target. Null when the mod has no Keyed.
+    /// </summary>
+    private string? KeyedSourceLanguage(InstalledMod mod)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var folder in _env.LoadFoldersFor(mod))
+        {
+            var languages = Path.Combine(folder, "Languages");
+            if (!Directory.Exists(languages))
+            {
+                continue;
+            }
+            foreach (var dir in Directory.GetDirectories(languages))
+            {
+                var keyed = Path.Combine(dir, "Keyed");
+                if (Directory.Exists(keyed))
+                {
+                    var name = Path.GetFileName(dir);
+                    counts[name] = counts.GetValueOrDefault(name) + Directory.EnumerateFiles(keyed, "*.xml", SearchOption.AllDirectories).Count();
+                }
+            }
+        }
+        if (_config.TargetLanguage != TargetLanguages.English && counts.GetValueOrDefault("English") > 0)
+        {
+            return "English";
+        }
+        return counts
+            .Where(kv => kv.Value > 0 && !TargetLanguages.FolderMatches(kv.Key, _config.TargetLanguage))
+            .OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => kv.Key).FirstOrDefault();
     }
 
     private Dictionary<string, string>? _englishKeys;
@@ -269,18 +314,43 @@ public sealed class ModScanner : IDisposable
     private static readonly System.Text.RegularExpressions.Regex LatinWord = new(@"[A-Za-z]{3,}", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// Whether a source text is already written in the target language: it has Chinese characters, no Latin word of three
-    /// or more letters (outside tokens), and no character that only exists in the other script.
+    /// Whether a source text is already written in the target language, judged by script:
+    /// - Chinese: Chinese characters, no kana or Hangul, no Latin word of three or more letters, and no character that only
+    ///   exists in the other Chinese script.
+    /// - Japanese: kana present; Korean: Hangul present; Cyrillic/Greek: that alphabet present; each without a Latin word.
+    /// - English: only Latin letters (the mod is assumed to be written in English).
+    /// - Other Latin-script languages: never (English and, say, German cannot be told apart by script).
     /// </summary>
-    private bool IsInTargetLanguage(string source)
+    internal bool IsInTargetLanguage(string source) => IsInLanguage(source, _config.TargetLanguage);
+
+    public static bool IsInLanguage(string source, string language)
     {
         var text = Tokens.StripTokens(source);
-        if (!text.Any(c => c >= 0x3400 && c <= 0x9FFF) || LatinWord.IsMatch(text))
+        var letters = text.Where(char.IsLetter).ToList();
+        if (letters.Count == 0)
         {
             return false;
         }
-        var wrong = _config.IsTraditional ? SimplifiedChars.FindIn(text) : TraditionalChars.FindIn(text);
-        return wrong.Count == 0;
+        switch (TargetLanguages.ScriptOf(language))
+        {
+            case TargetScript.Simplified:
+            case TargetScript.Traditional:
+                if (!text.Any(Scripts.IsHan) || text.Any(c => Scripts.IsKana(c) || Scripts.IsHangul(c)) || LatinWord.IsMatch(text))
+                {
+                    return false;
+                }
+                return (language == TargetLanguages.Traditional ? SimplifiedChars.FindIn(text) : TraditionalChars.FindIn(text)).Count == 0;
+            case TargetScript.Japanese:
+                return text.Any(Scripts.IsKana) && !text.Any(Scripts.IsHangul) && !LatinWord.IsMatch(text);
+            case TargetScript.Korean:
+                return text.Any(Scripts.IsHangul) && !LatinWord.IsMatch(text);
+            case TargetScript.Cyrillic:
+                return text.Any(Scripts.IsCyrillic) && !LatinWord.IsMatch(text);
+            case TargetScript.Greek:
+                return text.Any(Scripts.IsGreek) && !LatinWord.IsMatch(text);
+            default:
+                return language == TargetLanguages.English && letters.All(Scripts.IsLatin);
+        }
     }
 
     /// <summary>Target-language translations that already exist in all active mods (excluding this pack).</summary>

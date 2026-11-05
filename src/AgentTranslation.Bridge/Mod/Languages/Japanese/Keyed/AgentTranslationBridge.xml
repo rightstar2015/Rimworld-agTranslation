@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <AgentTranslationBridge.Title>Agent Translation</AgentTranslationBridge.Title>
+  <AgentTranslationBridge.ModeSimple>かんたんモード</AgentTranslationBridge.ModeSimple>
+  <AgentTranslationBridge.ModeAdvanced>詳細モード</AgentTranslationBridge.ModeAdvanced>
+  <AgentTranslationBridge.ModeSimpleTip>多くのプレイヤーに必要な項目だけを表示します。すべての設定と詳しいレポートは詳細モードで表示されます。</AgentTranslationBridge.ModeSimpleTip>
+  <AgentTranslationBridge.ModeAdvancedTip>すべての設定、ゲーム内チェック、詳しいレポート。</AgentTranslationBridge.ModeAdvancedTip>
+  <AgentTranslationBridge.HowToHeader>使い方</AgentTranslationBridge.HowToHeader>
+  <AgentTranslationBridge.HowTo1>1. お使いの AI ツール（例：Claude アプリ）に rwat を接続します。手順は README にあります。</AgentTranslationBridge.HowTo1>
+  <AgentTranslationBridge.HowTo2>2. AI アシスタントに「有効なモッドを翻訳して、翻訳パックを作って」と頼みます。</AgentTranslationBridge.HowTo2>
+  <AgentTranslationBridge.HowTo3>3. ゲームを再起動し、モッド一覧で「Agent Translation Pack」を有効にして一番最後に置きます。</AgentTranslationBridge.HowTo3>
+  <AgentTranslationBridge.StatusHeader>現在の状態</AgentTranslationBridge.StatusHeader>
+  <AgentTranslationBridge.NextStep>次にすること：{0}</AgentTranslationBridge.NextStep>
+  <AgentTranslationBridge.SimpleNextWait>メインメニューやセーブの読み込み後に自動でチェックします。</AgentTranslationBridge.SimpleNextWait>
+  <AgentTranslationBridge.SimpleNoPack>有効な翻訳パックがまだありません。</AgentTranslationBridge.SimpleNoPack>
+  <AgentTranslationBridge.SimpleNextTranslate>上の手順 2 と 3 を行ってください。</AgentTranslationBridge.SimpleNextTranslate>
+  <AgentTranslationBridge.SimpleNextLanguage>下の翻訳パックの言語をゲームの言語に合わせ、AI アシスタントにパックを作り直してもらってから、ゲームを再起動してください。</AgentTranslationBridge.SimpleNextLanguage>
+  <AgentTranslationBridge.SimpleAllOk>翻訳パックの {0} 件すべてが反映されています。</AgentTranslationBridge.SimpleAllOk>
+  <AgentTranslationBridge.SimpleNextMore>ほかのモッドも翻訳するには、AI アシスタントに続けてもらいパックを作り直してから、ゲームを再起動してください。</AgentTranslationBridge.SimpleNextMore>
+  <AgentTranslationBridge.SimpleSomeProblems>{1} 件中 {0} 件が反映され、{2} 件は反映されていません（ほかのモッドや翻訳パッチが同じ文を訳していることがよくあります）。</AgentTranslationBridge.SimpleSomeProblems>
+  <AgentTranslationBridge.SimpleNextAdvanced>どのモッドかは詳細モードで確認できます。ゲーム内の表示に問題がなければ対応は不要です。</AgentTranslationBridge.SimpleNextAdvanced>
+  <AgentTranslationBridge.ButtonsHeader>ショートカットボタン</AgentTranslationBridge.ButtonsHeader>
+  <AgentTranslationBridge.ShowCornerButton>右下のアイコン列にボタンを表示</AgentTranslationBridge.ShowCornerButton>
+  <AgentTranslationBridge.ShowCornerButtonTip>ゲームの切り替えアイコン（区域、美しさなど）の横に小さなアイコンを置きます。押すとこのページが開きます。</AgentTranslationBridge.ShowCornerButtonTip>
+  <AgentTranslationBridge.NeedsHarmony>（Harmony モッドが必要）</AgentTranslationBridge.NeedsHarmony>
+  <AgentTranslationBridge.ShowTabButton>下部のタブバーにボタンを表示</AgentTranslationBridge.ShowTabButton>
+  <AgentTranslationBridge.ShowTabButtonTip>画面下部の「メニュー」の横に小さなタブボタンを置きます。押すとこのページが開きます。</AgentTranslationBridge.ShowTabButtonTip>
+  <AgentTranslationBridge.Immediate>これらの設定はすぐに反映されます。</AgentTranslationBridge.Immediate>
+  <AgentTranslationBridge.CheckHeader>ゲーム内チェック（すぐに反映）</AgentTranslationBridge.CheckHeader>
+  <AgentTranslationBridge.ReportHeader>詳しいレポート</AgentTranslationBridge.ReportHeader>
+  <AgentTranslationBridge.ReportEnabled>実行時レポートを書き出す</AgentTranslationBridge.ReportEnabled>
+  <AgentTranslationBridge.ReportEnabledTip>読み込み後、翻訳パックのどの訳が実際に反映されているかを調べ、結果を rwat ツールに書き出します。</AgentTranslationBridge.ReportEnabledTip>
+  <AgentTranslationBridge.ReloadEnabled>実験的：再起動せずに Keyed の訳を読み込み直せるようにする</AgentTranslationBridge.ReloadEnabled>
+  <AgentTranslationBridge.ReloadEnabledTip>読み込み直すのは Keyed（UI の文字列）だけです。Def の名前や説明は再起動が必要です。起動時にキャッシュされる文字列は更新されないことがあります。</AgentTranslationBridge.ReloadEnabledTip>
+  <AgentTranslationBridge.Refresh>レポートを作り直す</AgentTranslationBridge.Refresh>
+  <AgentTranslationBridge.ReloadNow>今すぐ Keyed を読み込み直す（実験的）</AgentTranslationBridge.ReloadNow>
+  <AgentTranslationBridge.NoReport>まだレポートがありません。</AgentTranslationBridge.NoReport>
+  <AgentTranslationBridge.Working>レポートを作成中……</AgentTranslationBridge.Working>
+  <AgentTranslationBridge.NoPack>有効なモッドの中に翻訳パックが見つかりません。</AgentTranslationBridge.NoPack>
+  <AgentTranslationBridge.LanguageMismatch>翻訳パックの言語は {0} ですが、ゲームの言語は {1} です。訳は読み込まれません。</AgentTranslationBridge.LanguageMismatch>
+  <AgentTranslationBridge.LastReport>前回のレポート：{0}</AgentTranslationBridge.LastReport>
+  <AgentTranslationBridge.Summary>パックの項目：{0}。反映済み：{1}（うち {6} 件はほかのモッドが文を追加）。ほかのモッドが上書き：{2}。実行中に変更：{3}。未読み込み・未適用：{4}。不明：{5}。</AgentTranslationBridge.Summary>
+  <AgentTranslationBridge.ErrorCount>この言語でゲームが報告した翻訳エラー数：{0}</AgentTranslationBridge.ErrorCount>
+  <AgentTranslationBridge.ProblemsHeader>反映されていない項目があるモッド：</AgentTranslationBridge.ProblemsHeader>
+  <AgentTranslationBridge.ProblemRow>{0}：上書き {1}、変更 {2}、未反映 {3}</AgentTranslationBridge.ProblemRow>
+  <AgentTranslationBridge.ReloadResult>Keyed の再読み込み：{0} 件を適用しました。</AgentTranslationBridge.ReloadResult>
+  <AgentTranslationBridge.ReloadDisabled>Keyed の再読み込みはオフです。</AgentTranslationBridge.ReloadDisabled>
+  <AgentTranslationBridge.ToolSettings>翻訳ツールの詳細設定（rwat）</AgentTranslationBridge.ToolSettings>
+  <AgentTranslationBridge.LanguageHeader>翻訳パックの言語</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.LanguageTip>AI アシスタントが訳す先の言語です。ほとんどの場合「ゲームの言語に合わせる」で大丈夫です。</AgentTranslationBridge.LanguageTip>
+  <AgentTranslationBridge.Language.auto>ゲームの言語に合わせる</AgentTranslationBridge.Language.auto>
+  <AgentTranslationBridge.LanguageExperimental>（実験的）</AgentTranslationBridge.LanguageExperimental>
+  <AgentTranslationBridge.CodeKeys>モッドが定義し忘れたキーも翻訳する</AgentTranslationBridge.CodeKeys>
+  <AgentTranslationBridge.CodeKeysTip>英語でもキー名（Some.Key.Name など）がそのまま表示されるモッドがあります。オンにすると AI アシスタントがキー名から文を推測し、すべて推測として印が付きます。</AgentTranslationBridge.CodeKeysTip>
+  <AgentTranslationBridge.AutoAdopt>繁体字モード：既存の簡体字訳を自動で採用</AgentTranslationBridge.AutoAdopt>
+  <AgentTranslationBridge.AutoAdoptTip>config.json の条件に従い、既存の簡体字訳を繁体字に変換してそのまま使います。パックの言語が繁体字中国語のときだけ有効です。</AgentTranslationBridge.AutoAdoptTip>
+  <AgentTranslationBridge.ToolSettingsNote>変更は rwat の config.json に保存され、AI アシスタントを再起動すると反映されます。</AgentTranslationBridge.ToolSettingsNote>
+  <AgentTranslationBridge.ToolSettingsSaved>config.json に保存しました。AI アシスタントを再起動すると反映されます。</AgentTranslationBridge.ToolSettingsSaved>
+  <AgentTranslationBridge.ToolSettingsMissing>rwat の設定ファイルが見つかりません（{0}）。先に一度 rwat を起動してください。</AgentTranslationBridge.ToolSettingsMissing>
+  <AgentTranslationBridge.ToolSettingsError>設定ファイルを読み書きできませんでした（{0}）。</AgentTranslationBridge.ToolSettingsError>
+  <AgentTranslationBridge.ToolSettingsCustomDir>ブリッジのフォルダーが RWAT_BRIDGE_DIR で指定されているため、rwat の設定ファイルが見つかりません。config.json を直接編集してください。</AgentTranslationBridge.ToolSettingsCustomDir>
+  <AgentTranslationBridge.ConfigPath>設定ファイル：{0}</AgentTranslationBridge.ConfigPath>
+  <AgentTranslationBridge.QuickButtonTip>Agent Translation：設定と翻訳の状態</AgentTranslationBridge.QuickButtonTip>
+</LanguageData>

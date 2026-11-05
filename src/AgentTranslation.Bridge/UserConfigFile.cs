@@ -18,7 +18,48 @@ namespace AgentTranslation.Bridge;
 internal static class UserConfigFile
 {
     public const long MaxBytes = 1024 * 1024;
-    public static readonly string[] Languages = { "auto", "ChineseSimplified", "ChineseTraditional" };
+    /// <summary>A value of target_language and the language's own name (shown in the menu).</summary>
+    public sealed record LanguageOption(string Folder, string Native, bool Official);
+
+    /// <summary>
+    /// "auto" plus every language RimWorld 1.7 ships. Must match rwat's TargetLanguages.All (a unit test checks it); rwat
+    /// rejects any other value.
+    /// </summary>
+    public static readonly LanguageOption[] Languages =
+    {
+        new("auto", "", true),
+        new("ChineseSimplified", "简体中文", true),
+        new("ChineseTraditional", "繁體中文", true),
+        new("Japanese", "日本語", true),
+        new("Korean", "한국어", true),
+        new("English", "English", true),
+        new("Catalan", "Català", false),
+        new("Czech", "Čeština", false),
+        new("Danish", "Dansk", false),
+        new("Dutch", "Nederlands", false),
+        new("Estonian", "Eesti", false),
+        new("Finnish", "Suomi", false),
+        new("French", "Français", false),
+        new("German", "Deutsch", false),
+        new("Greek", "Ελληνικά", false),
+        new("Hungarian", "Magyar", false),
+        new("Italian", "Italiano", false),
+        new("Norwegian", "Norsk Bokmål", false),
+        new("Polish", "Polski", false),
+        new("Portuguese", "Português", false),
+        new("PortugueseBrazilian", "Português Brasileiro", false),
+        new("Romanian", "Română", false),
+        new("Russian", "Русский", false),
+        new("Slovak", "Slovenčina", false),
+        new("Spanish", "Español (Castellano)", false),
+        new("SpanishLatin", "Español (Latinoamérica)", false),
+        new("Swedish", "Svenska", false),
+        new("Turkish", "Türkçe", false),
+        new("Ukrainian", "Українська", false),
+        new("Vietnamese", "Tiếng Việt", false),
+    };
+
+    public static LanguageOption? FindLanguage(string? folder) => Array.Find(Languages, l => l.Folder == folder);
 
     public sealed record Values(string TargetLanguage, bool CodeKeys, bool AutoAdopt);
 
@@ -36,13 +77,13 @@ internal static class UserConfigFile
         {
             return null;
         }
-        var lang = root["target_language"] is JsonValue v && v.TryGetValue<string>(out var s) && Array.IndexOf(Languages, s) >= 0 ? s : "auto";
+        var lang = root["target_language"] is JsonValue v && v.TryGetValue<string>(out var s) && FindLanguage(s) != null ? s : "auto";
         return new Values(lang, Flag(root, "code_keys"), Flag(root, "simplified_auto_adopt"));
     }
 
     public static bool Write(string path, Values values, out string? error)
     {
-        if (Array.IndexOf(Languages, values.TargetLanguage) < 0)
+        if (FindLanguage(values.TargetLanguage) == null)
         {
             error = "invalid_language";
             return false;

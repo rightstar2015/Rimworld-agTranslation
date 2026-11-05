@@ -130,6 +130,7 @@ public class UserGlossaryConversionTests
     }
 }
 
+[Collection("CharSets")]
 public class LanguageModeTests
 {
     [Fact]
@@ -173,6 +174,8 @@ public class LanguageModeTests
         Directory.CreateDirectory(dir);
         try
         {
+            // 牆 is Traditional-only in the full character set, which the server installs at startup.
+            AgentTranslation.Tests.FullCharSets.Ensure();
             var g = UserGlossary.Load(dir);
             g.Add("en", "Steel", "钢铁", null, "user", TargetLanguages.Simplified);
             g.Add("en", "Steel", "鋼鐵", null, "user", TargetLanguages.Traditional);

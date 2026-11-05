@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -27,7 +27,7 @@ public sealed partial class TranslationService
         }
         var map = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         var terms = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
-        foreach (var rec in Chinese.OfficialFor(_config.TargetLanguage).Values)
+        foreach (var rec in OfficialRecords())
         {
             if (rec.EnglishComment == null || rec.Text.Length == 0)
             {
@@ -59,6 +59,40 @@ public sealed partial class TranslationService
         _officialTerms = terms.ToDictionary(kv => kv.Key, kv => kv.Value.OrderByDescending(x => x.Value).First().Key, StringComparer.Ordinal);
         _officialByEnglish = map;
         return map;
+    }
+
+    /// <summary>
+    /// The game's official translation of the target language: the Chinese data already loaded by ChineseResources, or the
+    /// shipped .tar files (Data/*/Languages/&lt;Language&gt; (...).tar) for other languages. English has none (it is the source).
+    /// </summary>
+    private IEnumerable<LanguageRecord> OfficialRecords()
+    {
+        if (TargetLanguages.IsChinese(_config.TargetLanguage))
+        {
+            return Chinese.OfficialFor(_config.TargetLanguage).Values;
+        }
+        var data = System.IO.Path.Combine(_env.GameDir, "Data");
+        if (_config.TargetLanguage == TargetLanguages.English || !System.IO.Directory.Exists(data))
+        {
+            return Array.Empty<LanguageRecord>();
+        }
+        var records = new List<LanguageRecord>();
+        foreach (var dlc in System.IO.Directory.GetDirectories(data))
+        {
+            var langs = System.IO.Path.Combine(dlc, "Languages");
+            if (!System.IO.Directory.Exists(langs))
+            {
+                continue;
+            }
+            foreach (var tar in System.IO.Directory.GetFiles(langs, "*.tar"))
+            {
+                if (TargetLanguages.FolderMatches(System.IO.Path.GetFileNameWithoutExtension(tar), _config.TargetLanguage))
+                {
+                    records.AddRange(LanguageFileReader.Read(ChineseResources.TarFiles(tar)));
+                }
+            }
+        }
+        return records;
     }
 
     private Dictionary<string, string> OfficialTerms()
@@ -124,7 +158,7 @@ public sealed partial class TranslationService
         {
             list.Add(new
             {
-                source = traditional ? "simplified_converted" : "existing_simplified",
+                source = traditional ? "simplified_converted" : _config.TargetLanguage == TargetLanguages.Simplified ? "existing_simplified" : "existing_translation",
                 text = s.Conversion.Text,
                 simplified = traditional ? s.Source.Record.Text : null,
                 tier = TierId(s.Tier),
@@ -152,7 +186,7 @@ public sealed partial class TranslationService
         {
             foreach (var (t, provider) in Simplified.ByEnglish(e.Source).Where(x => s == null || x.Text != s.Conversion.Text).Take(2))
             {
-                list.Add(new { source = "same_english_simplified", text = t, mod = provider, usage = "How another mod translated the same English; keep wording consistent." });
+                list.Add(new { source = _config.TargetLanguage == TargetLanguages.Simplified ? "same_english_simplified" : "same_source_other_mod", text = t, mod = provider, usage = "How another mod translated the same source text; keep wording consistent." });
             }
         }
         if (PackIndex().TryGetValue(en, out var pack))
@@ -187,13 +221,13 @@ public sealed partial class TranslationService
                 }
                 if (user.TryGetValue(phrase, out var u))
                 {
-                    found[phrase] = new { en = u.Source, zh = u.Target, origin = u.Origin, note = u.Note };
+                    found[phrase] = new { source = u.Source, target = u.Target, origin = u.Origin, note = u.Note };
                 }
                 // Single-word official names are often ordinary words with a game-specific meaning (Still -> stillborn,
                 // Clear -> weather); suggest them only for short label-like sources.
                 else if ((n > 1 || words.Count <= 4) && official.TryGetValue(phrase, out var o))
                 {
-                    found[phrase] = new { en = phrase, zh = o, origin = "official", note = (string?)null };
+                    found[phrase] = new { source = phrase, target = o, origin = "official", note = (string?)null };
                 }
             }
         }
@@ -211,26 +245,29 @@ public sealed partial class TranslationService
             }
             var max = Math.Clamp(limit ?? 10, 1, 30);
             var q = text.Trim();
-            var cjk = q.Any(c => c >= 0x3400 && c <= 0x9FFF);
+            // A query in Latin letters is matched against the source side, anything else against the translations; for
+            // Latin-script targets both sides are searched.
+            var latinTarget = TargetLanguages.ScriptOf(_config.TargetLanguage) == TargetScript.Latin;
+            var cjk = !q.Where(char.IsLetter).All(Scripts.IsLatin);
             bool Hit(string s) => s.Contains(q, StringComparison.OrdinalIgnoreCase);
 
             var official = OfficialByEnglish()
-                .Where(kv => cjk ? kv.Value.Any(Hit) : Hit(kv.Key))
+                .Where(kv => latinTarget ? Hit(kv.Key) || kv.Value.Any(Hit) : cjk ? kv.Value.Any(Hit) : Hit(kv.Key))
                 .OrderBy(kv => kv.Key.Length)
                 .Take(max)
-                .Select(kv => new { en = kv.Key, zh = kv.Value })
+                .Select(kv => new { source = kv.Key, target = kv.Value })
                 .ToList();
             var pack = PackIndex()
-                .Where(kv => cjk ? kv.Value.Any(v => Hit(v.Text)) : Hit(kv.Key))
+                .Where(kv => latinTarget ? Hit(kv.Key) || kv.Value.Any(v => Hit(v.Text)) : cjk ? kv.Value.Any(v => Hit(v.Text)) : Hit(kv.Key))
                 .OrderBy(kv => kv.Key.Length)
                 .Take(max)
-                .Select(kv => new { en = kv.Key, zh = kv.Value.Select(v => v.Text).ToList(), mods = kv.Value.Select(v => v.PackageId).Distinct().ToList() })
+                .Select(kv => new { source = kv.Key, target = kv.Value.Select(v => v.Text).ToList(), mods = kv.Value.Select(v => v.PackageId).Distinct().ToList() })
                 .ToList();
             var otherMods = _config.IsTraditional ? null : Simplified.EnglishIndex()
-                .Where(kv => cjk ? kv.Value.Any(v => Hit(v.Text)) : Hit(kv.Key))
+                .Where(kv => latinTarget ? Hit(kv.Key) || kv.Value.Any(v => Hit(v.Text)) : cjk ? kv.Value.Any(v => Hit(v.Text)) : Hit(kv.Key))
                 .OrderBy(kv => kv.Key.Length)
                 .Take(max)
-                .Select(kv => new { en = kv.Key, zh = kv.Value.Select(v => v.Text).ToList(), mods = kv.Value.Select(v => v.Provider).Distinct().ToList() })
+                .Select(kv => new { source = kv.Key, target = kv.Value.Select(v => v.Text).ToList(), mods = kv.Value.Select(v => v.Provider).Distinct().ToList() })
                 .ToList();
             var glossary = Glossary.For(_config.TargetLanguage)
                 .Where(g => Hit(g.Source) || Hit(g.Target))
@@ -280,7 +317,7 @@ public sealed partial class TranslationService
                 .Where(kv => kv.Key.Contains(q, StringComparison.OrdinalIgnoreCase) || kv.Value.Contains(q, StringComparison.Ordinal))
                 .OrderBy(kv => kv.Key.Length)
                 .Take(20)
-                .Select(kv => (object)new { en = kv.Key, zh = kv.Value })
+                .Select(kv => (object)new { source = kv.Key, target = kv.Value })
                 .ToList();
             return new
             {

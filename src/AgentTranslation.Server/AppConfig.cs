@@ -9,20 +9,67 @@ using AgentTranslation.Core;
 
 namespace AgentTranslation.Server;
 
-/// <summary>Supported target languages. Only these two folder names are ever accepted.</summary>
+/// <summary>One language the game ships (its legacy folder name is what the pack and config use).</summary>
+public sealed record GameLanguage(string Folder, string English, string Native, TargetScript Script, bool Official);
+
+/// <summary>
+/// Supported target languages: the languages RimWorld 1.7 ships (Data/Core/Languages, checked on the local install).
+/// Only these folder names are ever accepted. Chinese, Japanese, Korean and English are fully supported; the others are
+/// experimental (format checks only; no language-specific checks).
+/// </summary>
 public static class TargetLanguages
 {
     public const string Simplified = "ChineseSimplified";
     public const string Traditional = "ChineseTraditional";
+    public const string English = "English";
+    public const string Japanese = "Japanese";
+    public const string Korean = "Korean";
 
     /// <summary>Setting value meaning "follow the game language".</summary>
     public const string Auto = "auto";
 
-    public static bool IsValid(string? value) => value is Simplified or Traditional;
+    public static readonly IReadOnlyList<GameLanguage> All = new[]
+    {
+        new GameLanguage(Simplified, "Simplified Chinese", "简体中文", TargetScript.Simplified, true),
+        new GameLanguage(Traditional, "Traditional Chinese", "繁體中文", TargetScript.Traditional, true),
+        new GameLanguage(Japanese, "Japanese", "日本語", TargetScript.Japanese, true),
+        new GameLanguage(Korean, "Korean", "한국어", TargetScript.Korean, true),
+        new GameLanguage(English, "English", "English", TargetScript.Latin, true),
+        new GameLanguage("Catalan", "Catalan", "Català", TargetScript.Latin, false),
+        new GameLanguage("Czech", "Czech", "Čeština", TargetScript.Latin, false),
+        new GameLanguage("Danish", "Danish", "Dansk", TargetScript.Latin, false),
+        new GameLanguage("Dutch", "Dutch", "Nederlands", TargetScript.Latin, false),
+        new GameLanguage("Estonian", "Estonian", "Eesti", TargetScript.Latin, false),
+        new GameLanguage("Finnish", "Finnish", "Suomi", TargetScript.Latin, false),
+        new GameLanguage("French", "French", "Français", TargetScript.Latin, false),
+        new GameLanguage("German", "German", "Deutsch", TargetScript.Latin, false),
+        new GameLanguage("Greek", "Greek", "Ελληνικά", TargetScript.Greek, false),
+        new GameLanguage("Hungarian", "Hungarian", "Magyar", TargetScript.Latin, false),
+        new GameLanguage("Italian", "Italian", "Italiano", TargetScript.Latin, false),
+        new GameLanguage("Norwegian", "Norwegian", "Norsk Bokmål", TargetScript.Latin, false),
+        new GameLanguage("Polish", "Polish", "Polski", TargetScript.Latin, false),
+        new GameLanguage("Portuguese", "Portuguese", "Português", TargetScript.Latin, false),
+        new GameLanguage("PortugueseBrazilian", "Brazilian Portuguese", "Português Brasileiro", TargetScript.Latin, false),
+        new GameLanguage("Romanian", "Romanian", "Română", TargetScript.Latin, false),
+        new GameLanguage("Russian", "Russian", "Русский", TargetScript.Cyrillic, false),
+        new GameLanguage("Slovak", "Slovak", "Slovenčina", TargetScript.Latin, false),
+        new GameLanguage("Spanish", "Spanish (Spain)", "Español (Castellano)", TargetScript.Latin, false),
+        new GameLanguage("SpanishLatin", "Spanish (Latin America)", "Español (Latinoamérica)", TargetScript.Latin, false),
+        new GameLanguage("Swedish", "Swedish", "Svenska", TargetScript.Latin, false),
+        new GameLanguage("Turkish", "Turkish", "Türkçe", TargetScript.Latin, false),
+        new GameLanguage("Ukrainian", "Ukrainian", "Українська", TargetScript.Cyrillic, false),
+        new GameLanguage("Vietnamese", "Vietnamese", "Tiếng Việt", TargetScript.Latin, false),
+    };
+
+    public static GameLanguage? Find(string? folder) => All.FirstOrDefault(l => l.Folder == folder);
+
+    public static bool IsValid(string? value) => Find(value) != null;
+
+    public static string ValidList => "auto, " + string.Join(", ", All.Select(l => l.Folder));
 
     /// <summary>
     /// Target language for a game language folder name from Prefs.xml ("ChineseTraditional (繁體中文)" etc.).
-    /// Null when the game language is not Chinese.
+    /// Null when the game language is not one of the known languages.
     /// </summary>
     public static string? FromGameLanguage(string? gameLanguage)
     {
@@ -30,22 +77,28 @@ public static class TargetLanguages
         {
             return null;
         }
-        if (FolderMatches(gameLanguage, Traditional))
-        {
-            return Traditional;
-        }
-        return FolderMatches(gameLanguage, Simplified) ? Simplified : null;
+        return All.FirstOrDefault(l => FolderMatches(gameLanguage, l.Folder))?.Folder;
     }
 
-    public static TargetScript ScriptOf(string language) => language == Traditional ? TargetScript.Traditional : TargetScript.Simplified;
+    public static TargetScript ScriptOf(string language) => Find(language)?.Script ?? TargetScript.Latin;
+
+    public static bool IsChinese(string language) => language is Simplified or Traditional;
+
+    public static bool IsOfficial(string language) => Find(language)?.Official ?? false;
 
     /// <summary>Language name shown to agents.</summary>
-    public static string AgentName(string language) => language == Traditional
-        ? "Traditional Chinese (Taiwan usage, e.g. 軟體, 介面, 資料夾)"
-        : "Simplified Chinese (mainland usage)";
+    public static string AgentName(string language) => language switch
+    {
+        Traditional => "Traditional Chinese (Taiwan usage, e.g. 軟體, 介面, 資料夾)",
+        Simplified => "Simplified Chinese (mainland usage)",
+        Japanese => "Japanese (natural game UI Japanese in kanji and kana; no romaji)",
+        Korean => "Korean (Hangul, standard South Korean usage)",
+        English => "English",
+        _ => (Find(language)?.English ?? language) + " (experimental: only format checks, no language-specific checks)",
+    };
 
     /// <summary>Native name used in the pack's About.xml.</summary>
-    public static string NativeName(string language) => language == Traditional ? "繁體中文" : "简体中文";
+    public static string NativeName(string language) => Find(language)?.Native ?? language;
 
     /// <summary>The other Chinese language (source of conversion memory in Traditional mode).</summary>
     public static string Other(string language) => language == Traditional ? Simplified : Traditional;
@@ -73,14 +126,14 @@ public sealed class AppConfig
     /// <summary>Pack name shown in the mod list; null means "Agent Translation Pack (&lt;language&gt;)".</summary>
     public string? PackDisplayName { get; set; }
     /// <summary>
-    /// "auto" (default: follow the game language, Simplified when the game is not in Chinese), ChineseSimplified or
-    /// ChineseTraditional. Written to config.json as target_language.
+    /// "auto" (default: follow the game language) or a language folder name from <see cref="TargetLanguages.All"/>.
+    /// Written to config.json as target_language.
     /// </summary>
     [JsonPropertyName("target_language")]
     public string TargetLanguageSetting { get; set; } = TargetLanguages.Auto;
 
     /// <summary>
-    /// Effective target language: ChineseSimplified or ChineseTraditional. Decides the output folder, the "already
+    /// Effective target language (a legacy language folder name). Decides the output folder, the "already
     /// translated" check, memory sources, the wrong-script validation and the glossary targets. The game matches language
     /// folders by full name or by the legacy name before the parenthesis, so the legacy name is enough.
     /// Set by <see cref="ResolveTargetLanguage"/> once the game language is known.
@@ -113,7 +166,7 @@ public sealed class AppConfig
         }
         var fromGame = TargetLanguages.FromGameLanguage(gameLanguage);
         TargetLanguage = fromGame ?? TargetLanguages.Simplified;
-        TargetLanguageSource = fromGame != null ? "game_language" : "default (game language is not Chinese)";
+        TargetLanguageSource = fromGame != null ? "game_language" : "default (game language unknown)";
     }
     public int DefaultBatchSize { get; set; } = 30;
     public int MaxBatchSize { get; set; } = 100;
@@ -231,7 +284,7 @@ public sealed class AppConfig
         }
         if (!TargetLanguages.IsValid(config.TargetLanguageSetting) && config.TargetLanguageSetting != TargetLanguages.Auto)
         {
-            throw new InvalidOperationException("target_language must be auto, ChineseSimplified or ChineseTraditional.");
+            throw new InvalidOperationException("target_language must be one of: " + TargetLanguages.ValidList + ".");
         }
         config.TargetLanguage = TargetLanguages.IsValid(config.TargetLanguageSetting) ? config.TargetLanguageSetting : TargetLanguages.Simplified;
         // Older config files lack newer sections: write them back (with defaults) so the user can see what can be changed.
@@ -249,7 +302,7 @@ public sealed class AppConfig
         {
             if (!TargetLanguages.IsValid(envLang.Trim()))
             {
-                throw new InvalidOperationException("RWAT_TARGET_LANGUAGE must be ChineseSimplified or ChineseTraditional.");
+                throw new InvalidOperationException("RWAT_TARGET_LANGUAGE must be a language folder name: " + string.Join(", ", TargetLanguages.All.Select(l => l.Folder)) + ".");
             }
             config.TargetLanguage = envLang.Trim();
             config._targetFromEnvironment = true;

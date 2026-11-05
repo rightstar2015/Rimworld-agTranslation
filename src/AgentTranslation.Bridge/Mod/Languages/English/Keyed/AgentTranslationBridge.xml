@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LanguageData>
   <AgentTranslationBridge.Title>Agent Translation</AgentTranslationBridge.Title>
+  <AgentTranslationBridge.ModeSimple>Simple mode</AgentTranslationBridge.ModeSimple>
+  <AgentTranslationBridge.ModeAdvanced>Advanced mode</AgentTranslationBridge.ModeAdvanced>
+  <AgentTranslationBridge.ModeSimpleTip>Shows only what most players need. Switch to advanced mode for every option and the full report.</AgentTranslationBridge.ModeSimpleTip>
+  <AgentTranslationBridge.ModeAdvancedTip>All options, the in-game check and the full report.</AgentTranslationBridge.ModeAdvancedTip>
+  <AgentTranslationBridge.HowToHeader>How to use</AgentTranslationBridge.HowToHeader>
+  <AgentTranslationBridge.HowTo1>1. Connect rwat to your AI tool (for example the Claude app). The README explains how.</AgentTranslationBridge.HowTo1>
+  <AgentTranslationBridge.HowTo2>2. Ask your AI assistant: "Translate my active mods and build the translation pack."</AgentTranslationBridge.HowTo2>
+  <AgentTranslationBridge.HowTo3>3. Restart the game, enable "Agent Translation Pack" in the mod list and keep it last.</AgentTranslationBridge.HowTo3>
+  <AgentTranslationBridge.StatusHeader>Status</AgentTranslationBridge.StatusHeader>
+  <AgentTranslationBridge.NextStep>Next: {0}</AgentTranslationBridge.NextStep>
+  <AgentTranslationBridge.SimpleNextWait>the check runs by itself at the main menu and after a save loads.</AgentTranslationBridge.SimpleNextWait>
+  <AgentTranslationBridge.SimpleNoPack>No translation pack is active yet.</AgentTranslationBridge.SimpleNoPack>
+  <AgentTranslationBridge.SimpleNextTranslate>follow steps 2 and 3 above.</AgentTranslationBridge.SimpleNextTranslate>
+  <AgentTranslationBridge.SimpleNextLanguage>set the pack language below to the game language, ask your AI assistant to rebuild the pack, then restart the game.</AgentTranslationBridge.SimpleNextLanguage>
+  <AgentTranslationBridge.SimpleAllOk>All {0} translations of the pack are in effect.</AgentTranslationBridge.SimpleAllOk>
+  <AgentTranslationBridge.SimpleNextMore>to translate more mods, ask your AI assistant to continue and rebuild the pack, then restart the game.</AgentTranslationBridge.SimpleNextMore>
+  <AgentTranslationBridge.SimpleSomeProblems>{0} of {1} translations are in effect; {2} are not (often another mod or patch already translates them).</AgentTranslationBridge.SimpleSomeProblems>
+  <AgentTranslationBridge.SimpleNextAdvanced>switch to advanced mode to see which mods are affected. Nothing needs fixing unless the text looks wrong in game.</AgentTranslationBridge.SimpleNextAdvanced>
+  <AgentTranslationBridge.ButtonsHeader>Quick buttons</AgentTranslationBridge.ButtonsHeader>
+  <AgentTranslationBridge.ShowCornerButton>Button in the bottom-right icon row</AgentTranslationBridge.ShowCornerButton>
+  <AgentTranslationBridge.ShowCornerButtonTip>A small icon next to the game's own toggles (zones, beauty, ...). Opens this page.</AgentTranslationBridge.ShowCornerButtonTip>
+  <AgentTranslationBridge.NeedsHarmony> (needs the Harmony mod)</AgentTranslationBridge.NeedsHarmony>
+  <AgentTranslationBridge.ShowTabButton>Button in the bottom tab bar</AgentTranslationBridge.ShowTabButton>
+  <AgentTranslationBridge.ShowTabButtonTip>A small tab button next to Menu at the bottom of the screen. Opens this page.</AgentTranslationBridge.ShowTabButtonTip>
+  <AgentTranslationBridge.Immediate>These switches take effect immediately.</AgentTranslationBridge.Immediate>
+  <AgentTranslationBridge.CheckHeader>In-game check (takes effect immediately)</AgentTranslationBridge.CheckHeader>
+  <AgentTranslationBridge.ReportHeader>Full report</AgentTranslationBridge.ReportHeader>
   <AgentTranslationBridge.ReportEnabled>Write runtime report</AgentTranslationBridge.ReportEnabled>
   <AgentTranslationBridge.ReportEnabledTip>After loading, check which translations of the pack are in effect and write the result for the rwat tool.</AgentTranslationBridge.ReportEnabledTip>
   <AgentTranslationBridge.ReloadEnabled>Experimental: allow reloading Keyed translations without restarting</AgentTranslationBridge.ReloadEnabled>
@@ -18,11 +45,11 @@
   <AgentTranslationBridge.ProblemRow>{0}: overridden {1}, changed {2}, not in effect {3}</AgentTranslationBridge.ProblemRow>
   <AgentTranslationBridge.ReloadResult>Keyed reload: {0} entries applied.</AgentTranslationBridge.ReloadResult>
   <AgentTranslationBridge.ReloadDisabled>Keyed reload is turned off.</AgentTranslationBridge.ReloadDisabled>
-  <AgentTranslationBridge.ToolSettings>Translation tool settings (rwat)</AgentTranslationBridge.ToolSettings>
-  <AgentTranslationBridge.LanguageHeader>Pack language:</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.ToolSettings>Translation tool, advanced (rwat)</AgentTranslationBridge.ToolSettings>
+  <AgentTranslationBridge.LanguageHeader>Pack language</AgentTranslationBridge.LanguageHeader>
+  <AgentTranslationBridge.LanguageTip>The language your AI assistant translates into. "Follow the game language" suits most players.</AgentTranslationBridge.LanguageTip>
   <AgentTranslationBridge.Language.auto>Follow the game language</AgentTranslationBridge.Language.auto>
-  <AgentTranslationBridge.Language.ChineseSimplified>Simplified Chinese</AgentTranslationBridge.Language.ChineseSimplified>
-  <AgentTranslationBridge.Language.ChineseTraditional>Traditional Chinese</AgentTranslationBridge.Language.ChineseTraditional>
+  <AgentTranslationBridge.LanguageExperimental> - experimental</AgentTranslationBridge.LanguageExperimental>
   <AgentTranslationBridge.CodeKeys>Translate keys that mods forgot to define</AgentTranslationBridge.CodeKeys>
   <AgentTranslationBridge.CodeKeysTip>Some mods show raw key names (such as Some.Key.Name) even in English. When on, your AI assistant infers a text from the key name; each one is marked as inferred.</AgentTranslationBridge.CodeKeysTip>
   <AgentTranslationBridge.AutoAdopt>Traditional mode: adopt existing Simplified translations automatically</AgentTranslationBridge.AutoAdopt>
@@ -32,4 +59,6 @@
   <AgentTranslationBridge.ToolSettingsMissing>rwat's settings file was not found ({0}). Run rwat once first.</AgentTranslationBridge.ToolSettingsMissing>
   <AgentTranslationBridge.ToolSettingsError>The settings file could not be read or written ({0}).</AgentTranslationBridge.ToolSettingsError>
   <AgentTranslationBridge.ToolSettingsCustomDir>The bridge folder is set with RWAT_BRIDGE_DIR, so rwat's settings file cannot be located. Edit config.json directly.</AgentTranslationBridge.ToolSettingsCustomDir>
+  <AgentTranslationBridge.ConfigPath>Settings file: {0}</AgentTranslationBridge.ConfigPath>
+  <AgentTranslationBridge.QuickButtonTip>Agent Translation: settings and translation status</AgentTranslationBridge.QuickButtonTip>
 </LanguageData>

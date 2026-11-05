@@ -360,15 +360,23 @@ public sealed class PackBuilder
             }
             sb.Append("  </loadAfter>\n");
         }
-        var tc = _config.IsTraditional;
         sb.Append("  <description>")
-          .Append(tc ? "由 AI Agent 經 rwat 工具產生的繁體中文翻譯包（機器翻譯，未經人工校對）。\n\n【重要】此模組必須放在所有被翻譯模組之後載入。\n不修改任何原始模組；刪除此模組即可完全移除翻譯。\n\n翻譯模組："
-                     : "由 AI Agent 经 rwat 工具生成的简体中文翻译包（机器翻译，未经人工校对）。\n\n【重要】此模组必须放在所有被翻译模组之后加载。\n不修改任何原始模组；删除此模组即可完全移除翻译。\n\n翻译模组：")
+          .Append(SecurityElement.Escape(DescriptionHead(_config.TargetLanguage)))
           .Append(mods.Count)
           .Append("\n\nMachine translation generated locally by an AI agent through rwat. Load after every translated mod.</description>\n");
         sb.Append("</ModMetaData>\n");
         return sb.ToString();
     }
+
+    /// <summary>First part of the pack's About description, in the pack's language where a text exists (English otherwise).</summary>
+    public static string DescriptionHead(string language) => language switch
+    {
+        TargetLanguages.Traditional => "由 AI Agent 經 rwat 工具產生的繁體中文翻譯包（機器翻譯，未經人工校對）。\n\n【重要】此模組必須放在所有被翻譯模組之後載入。\n不修改任何原始模組；刪除此模組即可完全移除翻譯。\n\n翻譯模組：",
+        TargetLanguages.Simplified => "由 AI Agent 经 rwat 工具生成的简体中文翻译包（机器翻译，未经人工校对）。\n\n【重要】此模组必须放在所有被翻译模组之后加载。\n不修改任何原始模组；删除此模组即可完全移除翻译。\n\n翻译模组：",
+        TargetLanguages.Japanese => "AI エージェントが rwat ツールで作成した日本語翻訳パックです（機械翻訳・人による校正なし）。\n\n【重要】このモッドは翻訳対象のすべてのモッドより後に読み込んでください。\n元のモッドは一切変更しません。このモッドを削除すれば翻訳は完全に取り除けます。\n\n翻訳したモッド：",
+        TargetLanguages.Korean => "AI 에이전트가 rwat 도구로 만든 한국어 번역 팩입니다(기계 번역, 사람의 검수 없음).\n\n[중요] 이 모드는 번역 대상인 모든 모드보다 뒤에 불러와야 합니다.\n원본 모드는 전혀 수정하지 않으며, 이 모드를 삭제하면 번역이 완전히 제거됩니다.\n\n번역한 모드: ",
+        _ => "Translation pack (" + TargetLanguages.NativeName(language) + ") made by an AI agent with the rwat tool (machine translation, not reviewed by a person).\n\nImportant: load this mod after every translated mod.\nNo original mod is changed; delete this mod to remove every translation.\n\nTranslated mods: ",
+    };
 
     private string Readme()
     {

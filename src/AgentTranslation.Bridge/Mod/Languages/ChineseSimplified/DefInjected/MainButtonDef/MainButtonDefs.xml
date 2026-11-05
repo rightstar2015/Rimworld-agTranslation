@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <AgentTranslation_Settings.label>AI 翻译</AgentTranslation_Settings.label>
+  <AgentTranslation_Settings.description>打开 Agent Translation 设置：翻译包语言、翻译状态和简短教学。</AgentTranslation_Settings.description>
+</LanguageData>
