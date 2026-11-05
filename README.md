@@ -60,6 +60,8 @@ Claude desktop app (chat), in Settings > Developer > Edit Config:
 { "mcpServers": { "rimworld-translation": { "command": "C:\\path\\to\\rwat.exe", "args": ["serve"] } } }
 ```
 
+Configure the server in one place only. The Claude desktop app's Code tab also loads the servers from the chat config, and when a project `.mcp.json` uses the same name the desktop entry wins, so its `RWAT_*` environment variables apply. `get_environment` shows the folders actually in use.
+
 Tools: `get_environment`, `list_mods`, `scan_mod`, `get_batch`, `submit_translations`, `validate_pack`, `build_pack`, `query_memory`, `glossary_get`, `glossary_add`, `adopt_simplified`, `request_reload`. None of them runs commands, reads arbitrary files or accesses the network.
 
 ## Optional in-game bridge

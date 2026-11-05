@@ -1,4 +1,4 @@
-# 階段 5：安全檢查、文件、多客戶端測試、授權與發佈（進行中）
+# 階段 5：安全檢查、文件、多客戶端測試、授權與發佈（完成，等你確認）
 
 規格要求：
 - 安全性檢查。
@@ -106,3 +106,16 @@
    - 設定頁出現「翻译工具设置」，切換開關後 config.json 跟著改。
 3. 客戶端測試：Code 分頁與對話分頁各跑一次完整流程，記錄在 `docs/CLIENT_TESTS.md`。
 4. 階段 5 結案報告，並更新 SECURITY_REVIEW 的最後結論。
+
+## 5. 收尾（2026-11-05）
+
+- 步驟 1 到 4 都完成了。
+- 遊戲內驗證：
+  - 報告寫到了新的 `AgentTranslation\bridge`，84 條都有生效，其中 9 條是 ok_extended。
+  - 在設定頁切換開關後，config.json 有寫入，其他欄位都保留。
+- 客戶端測試：對話分頁和 Code 分頁都通過，見 `CLIENT_TESTS.md`。
+- 測試中的發現：
+  - Claude 桌面版的設定檔實際位置在 `%LOCALAPPDATA%\Claude-Data\…`。
+  - Code 分頁也會載入桌面版設定裡的同名伺服器。
+  - 「list_mods 附上未翻譯數量」的想法已寫進 DESIGN_NOTES，這個階段不做。
+- 公開發佈（GitHub、Steam Workshop）由你來做。
