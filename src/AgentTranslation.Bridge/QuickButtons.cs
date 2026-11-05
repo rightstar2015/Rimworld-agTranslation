@@ -15,11 +15,8 @@ namespace AgentTranslation.Bridge;
 /// WidgetRow.ButtonIcon(Texture2D, string, ...), Dialog_ModSettings(Mod), MainButtonWorker.Visible / Activate(),
 /// ContentFinder&lt;Texture2D&gt;.Get, StaticConstructorOnStartup. Harmony postfixes on Waylith: verified in game (see docs).
 /// </summary>
-[StaticConstructorOnStartup]
 internal static class QuickButtons
 {
-    public static readonly Texture2D Icon = ContentFinder<Texture2D>.Get("AgentTranslation/QuickButton", reportFailure: false) ?? BaseContent.BadTex;
-
     /// <summary>True once the play-settings postfix is in place; false when Harmony is missing or patching failed.</summary>
     public static bool CornerAvailable { get; private set; }
 
@@ -77,7 +74,7 @@ internal static class QuickButtons
             {
                 return;
             }
-            if (row.ButtonIcon(Icon, GameApi.T("AgentTranslationBridge.QuickButtonTip")))
+            if (row.ButtonIcon(QuickButtonIcon.Icon, GameApi.T("AgentTranslationBridge.QuickButtonTip")))
             {
                 OpenSettings();
             }
@@ -87,6 +84,16 @@ internal static class QuickButtons
             // Never break the game's own controls.
         }
     }
+}
+
+/// <summary>
+/// The icon texture, in its own class so it is loaded by the game's StaticConstructorOnStartup pass on the main thread.
+/// (Keeping it in QuickButtons made the Mod constructor, which runs on a loading thread, load it: the game logs an error.)
+/// </summary>
+[StaticConstructorOnStartup]
+internal static class QuickButtonIcon
+{
+    public static readonly Texture2D Icon = ContentFinder<Texture2D>.Get("AgentTranslation/QuickButton", reportFailure: false) ?? BaseContent.BadTex;
 }
 
 /// <summary>Bottom bar tab button (Defs/MainButtonDefs.xml). Hidden when the user turns it off on the settings page.</summary>
